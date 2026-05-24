@@ -130,13 +130,54 @@ export default function CustomPatternEditor({
     ))
   }, [])
 
-  const handleCellClick = useCallback((row: number, col: number) => {
+  const appendCellToPath = useCallback((row: number, col: number) => {
+    const key = k(row, col)
+    if (hiddenSet.has(key) || cellToPlacement.has(key)) return
+
+    const nextCell: CustomPathPoint = { row, col }
+    const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step).map((c) => ({ ...c })) }))
+    const index = safeActivePathIndex
+
+    if (index >= nextPath.length) {
+      nextPath.push({
+        cells: [nextCell],
+        buildAs: 'singles',
+        play: 'one-by-one',
+        timing: nextPath.length === 0 ? 'sequence' : animationMode,
+      })
+      setActivePathIndex(nextPath.length - 1)
+    } else {
+      nextPath[index] = {
+        ...nextPath[index],
+        cells: [...getStepCells(nextPath[index]), nextCell],
+        tracks: undefined,
+        buildAs: nextPath[index].buildAs ?? 'singles',
+        play: nextPath[index].play ?? 'one-by-one',
+      }
+    }
+
+    updatePath(nextPath)
+  }, [animationMode, cellToPlacement, hiddenSet, path, safeActivePathIndex, updatePath])
+
+  const handleCellClick = useCallback((row: number, col: number, shiftKey: boolean) => {
     const key = k(row, col)
     if (hiddenSet.has(key)) return
-    toggleSelectedCell(key)
+
+    if (shiftKey) {
+      toggleSelectedCell(key)
+      const placement = cellToPlacement.get(key)
+      if (placement) setActivePathIndex(placement.pathIndex)
+      return
+    }
+
     const placement = cellToPlacement.get(key)
-    if (placement) setActivePathIndex(placement.pathIndex)
-  }, [cellToPlacement, hiddenSet, toggleSelectedCell])
+    if (placement) {
+      setActivePathIndex(placement.pathIndex)
+      return
+    }
+
+    appendCellToPath(row, col)
+  }, [appendCellToPath, cellToPlacement, hiddenSet, toggleSelectedCell])
 
   const withoutSelectedCells = useCallback(() => (
     path.flatMap((step) => {
@@ -283,6 +324,14 @@ export default function CustomPatternEditor({
           <h3 className="panel-title small">Build ordered paths on the grid</h3>
         </div>
         <div className="builder-actions">
+          <button
+            onClick={() => {
+              setSelectedKeys([])
+              setActivePathIndex(path.length)
+            }}
+          >
+            New path
+          </button>
           <button onClick={undoLast} disabled={path.length === 0}>Undo</button>
           <button onClick={clearAll} disabled={path.length === 0 && hiddenCells.length === 0}>Clear</button>
         </div>
@@ -309,7 +358,7 @@ export default function CustomPatternEditor({
                 return (
                   <button
                     key={key}
-                    onClick={() => handleCellClick(row, col)}
+                    onClick={(e) => handleCellClick(row, col, e.shiftKey)}
                     onContextMenu={(event) => {
                       event.preventDefault()
                       toggleHiddenCell(row, col)
@@ -385,14 +434,12 @@ export default function CustomPatternEditor({
             </div>
 
             {selectedCount === 0 ? (
-              <p className="muted-copy">Click cells to select them. Select 2+ to create a group.</p>
+              <p className="muted-copy">Click cells to add them to the path. Shift+click to select.</p>
             ) : (
               <div className="selection-tools">
-                <strong>{selectedCount} cell{selectedCount === 1 ? '' : 's'} selected</strong>
-                {canCreateGroup ? (
+                <strong>{selectedCount} selected</strong>
+                {canCreateGroup && (
                   <button onClick={handleAddToPath} className="secondary-action">Create group</button>
-                ) : (
-                  <button onClick={handleAddToPath} className="secondary-action">Add to path</button>
                 )}
                 <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
               </div>
