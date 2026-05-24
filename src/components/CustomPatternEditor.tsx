@@ -209,25 +209,10 @@ export default function CustomPatternEditor({
       const nextKeys = isCurrentlySelected
         ? selectedKeys.filter((s) => s !== key)
         : [...selectedKeys, key]
+      setSelectedKeys(nextKeys)
 
       const placement = cellToPlacement.get(key)
       if (placement) setActivePathIndex(placement.pathIndex)
-
-      if (nextKeys.length >= 2) {
-        const nextCells = nextKeys.map((k) => {
-          const [r, c] = k.split(',').map(Number)
-          const p = cellToPlacement.get(k)
-          if (p) {
-            const existing = getStepCells(path[p.pathIndex])[p.cellIndex]
-            if (existing) return { ...existing }
-          }
-          return { row: r, col: c }
-        })
-        addToPath(nextCells, nextKeys)
-      } else {
-        setSelectedKeys(nextKeys)
-      }
-
       return
     }
 
@@ -238,7 +223,7 @@ export default function CustomPatternEditor({
     }
 
     appendCellToPath(row, col)
-  }, [addToPath, appendCellToPath, cellToPlacement, hiddenSet, path, selectedKeys])
+  }, [appendCellToPath, cellToPlacement, hiddenSet, selectedKeys])
 
   const withoutSelectedCells = useCallback(() => (
     path.flatMap((step) => {
