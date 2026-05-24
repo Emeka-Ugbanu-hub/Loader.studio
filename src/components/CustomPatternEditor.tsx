@@ -122,14 +122,6 @@ export default function CustomPatternEditor({
     setSelectedKeys((keys) => keys.filter((selected) => selected !== key))
   }, [hiddenCells, hiddenSet, onHiddenCellsChange])
 
-  const toggleSelectedCell = useCallback((key: string) => {
-    setSelectedKeys((keys) => (
-      keys.includes(key)
-        ? keys.filter((selected) => selected !== key)
-        : [...keys, key]
-    ))
-  }, [])
-
   const appendCellToPath = useCallback((row: number, col: number) => {
     const key = k(row, col)
     if (hiddenSet.has(key) || cellToPlacement.has(key)) return
@@ -159,14 +151,83 @@ export default function CustomPatternEditor({
     updatePath(nextPath)
   }, [animationMode, cellToPlacement, hiddenSet, path, safeActivePathIndex, updatePath])
 
+  const addToPath = useCallback((cells: CustomPathPoint[], keys: string[]) => {
+    if (cells.length === 0) return
+
+    const keySet = new Set(keys)
+    const selectedIndexes = new Set(
+      keys
+        .map((key) => cellToPlacement.get(key)?.pathIndex)
+        .filter((idx): idx is number => idx !== undefined)
+    )
+
+    if (selectedIndexes.size === 1) {
+      const [index] = Array.from(selectedIndexes)
+      const allCells = getStepCells(path[index])
+      const selectedCoversPath = allCells.length === cells.length
+        && allCells.every((cell) => keySet.has(k(cell.row, cell.col)))
+
+      if (selectedCoversPath) {
+        if (cells.length >= 2) {
+          updatePath(path.map((step, stepIndex) => (
+            stepIndex === index
+              ? { ...step, cells, tracks: undefined, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
+              : step
+          )))
+        }
+        setActivePathIndex(index)
+        setSelectedKeys([])
+        return
+      }
+    }
+
+    const basePath = path.flatMap((step) => {
+      const remaining = getStepCells(step).filter((cell) => !keySet.has(k(cell.row, cell.col)))
+      if (remaining.length === 0) return []
+      return [{ ...step, cells: remaining, tracks: undefined }]
+    })
+
+    const step: CustomPathStep = {
+      cells,
+      buildAs: cells.length >= 2 ? 'group' : 'singles',
+      play: 'one-by-one',
+      pattern: cells.length >= 2 ? 'wave-lr' : undefined,
+      timing: basePath.length === 0 ? 'sequence' : animationMode,
+    }
+
+    updatePath([...basePath, step])
+    setActivePathIndex(basePath.length)
+    setSelectedKeys([])
+  }, [animationMode, cellToPlacement, path, updatePath])
+
   const handleCellClick = useCallback((row: number, col: number, shiftKey: boolean) => {
     const key = k(row, col)
     if (hiddenSet.has(key)) return
 
     if (shiftKey) {
-      toggleSelectedCell(key)
+      const isCurrentlySelected = selectedKeys.includes(key)
+      const nextKeys = isCurrentlySelected
+        ? selectedKeys.filter((s) => s !== key)
+        : [...selectedKeys, key]
+
       const placement = cellToPlacement.get(key)
       if (placement) setActivePathIndex(placement.pathIndex)
+
+      if (nextKeys.length >= 2) {
+        const nextCells = nextKeys.map((k) => {
+          const [r, c] = k.split(',').map(Number)
+          const p = cellToPlacement.get(k)
+          if (p) {
+            const existing = getStepCells(path[p.pathIndex])[p.cellIndex]
+            if (existing) return { ...existing }
+          }
+          return { row: r, col: c }
+        })
+        addToPath(nextCells, nextKeys)
+      } else {
+        setSelectedKeys(nextKeys)
+      }
+
       return
     }
 
@@ -177,7 +238,7 @@ export default function CustomPatternEditor({
     }
 
     appendCellToPath(row, col)
-  }, [appendCellToPath, cellToPlacement, hiddenSet, toggleSelectedCell])
+  }, [addToPath, appendCellToPath, cellToPlacement, hiddenSet, path, selectedKeys])
 
   const withoutSelectedCells = useCallback(() => (
     path.flatMap((step) => {
@@ -192,47 +253,8 @@ export default function CustomPatternEditor({
   ), [path, selectedSet])
 
   const handleAddToPath = useCallback(() => {
-    if (selectedCells.length === 0) return
-
-    const selectedIndexes = new Set(
-      selectedKeys
-        .map((key) => cellToPlacement.get(key)?.pathIndex)
-        .filter((idx): idx is number => idx !== undefined)
-    )
-
-    if (selectedIndexes.size === 1) {
-      const [index] = Array.from(selectedIndexes)
-      const allCells = getStepCells(path[index])
-      const selectedCoversPath = allCells.length === selectedCells.length
-        && allCells.every((cell) => selectedSet.has(k(cell.row, cell.col)))
-
-      if (selectedCoversPath) {
-        if (selectedCells.length >= 2) {
-          updatePath(path.map((step, stepIndex) => (
-            stepIndex === index
-              ? { ...step, cells: selectedCells, tracks: undefined, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
-              : step
-          )))
-        }
-        setActivePathIndex(index)
-        setSelectedKeys([])
-        return
-      }
-    }
-
-    const basePath = withoutSelectedCells()
-    const step: CustomPathStep = {
-      cells: selectedCells,
-      buildAs: selectedCells.length >= 2 ? 'group' : 'singles',
-      play: 'one-by-one',
-      pattern: selectedCells.length >= 2 ? 'wave-lr' : undefined,
-      timing: basePath.length === 0 ? 'sequence' : animationMode,
-    }
-
-    updatePath([...basePath, step])
-    setActivePathIndex(basePath.length)
-    setSelectedKeys([])
-  }, [animationMode, cellToPlacement, path, selectedCells, selectedKeys, selectedSet, updatePath, withoutSelectedCells])
+    addToPath(selectedCells, selectedKeys)
+  }, [addToPath, selectedCells, selectedKeys])
 
   const handleRemoveSelected = useCallback(() => {
     if (selectedKeys.length === 0) return
