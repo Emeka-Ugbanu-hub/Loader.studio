@@ -1,9 +1,8 @@
 'use client'
 
-import { useCallback, useState, useMemo } from 'react'
-import type { CustomPathStep, LoaderOptions, MovementPattern, CellShape } from '@/lib/types'
+import { useCallback, useMemo, useState } from 'react'
+import type { CellShape, CustomPathPoint, CustomPathStep, LoaderOptions, MovementPattern } from '@/lib/types'
 import { generateCustomFrames } from '@/lib/patterns'
-import LoaderCanvas from './LoaderCanvas'
 
 interface Props {
   options: LoaderOptions
@@ -14,332 +13,470 @@ interface Props {
   onHiddenCellsChange: (hidden: string[]) => void
 }
 
-function k(r: number, c: number) { return `${r},${c}` }
+type AnimationMode = 'sequence' | 'simultaneous'
 
-const DIRECTIONS: { key: MovementPattern | undefined; label: string; icon: string }[] = [
-  { key: undefined, label: 'Together', icon: '⊞' },
-  { key: 'wave-lr', label: 'Left', icon: '←' },
-  { key: 'wave-rl', label: 'Right', icon: '→' },
-  { key: 'wave-tb', label: 'Top', icon: '↑' },
-  { key: 'wave-bt', label: 'Bottom', icon: '↓' },
-  { key: 'diagonal', label: 'Diagonal', icon: '↘' },
-  { key: 'pulse', label: 'Pulse', icon: '◎' },
+function k(r: number, c: number) {
+  return `${r},${c}`
+}
+
+function labelForPath(index: number) {
+  return String.fromCharCode(65 + index)
+}
+
+function getStepCells(step: CustomPathStep) {
+  return [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+}
+
+function cellAlpha(cell: CustomPathPoint) {
+  return cell.opacity ?? 100
+}
+
+const DIRECTIONS: { key: MovementPattern | undefined; label: string }[] = [
+  { key: undefined, label: 'Clicked order' },
+  { key: 'wave-lr', label: 'Left to right' },
+  { key: 'wave-rl', label: 'Right to left' },
+  { key: 'wave-tb', label: 'Top to bottom' },
+  { key: 'wave-bt', label: 'Bottom to top' },
+  { key: 'diagonal', label: 'Diagonal' },
+  { key: 'pulse', label: 'Pulse' },
 ]
 
-export default function CustomPatternEditor({ options, frames, path, hiddenCells, onPathChange, onHiddenCellsChange }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
+
+export default function CustomPatternEditor({
+  options,
+  path,
+  hiddenCells,
+  onPathChange,
+  onHiddenCellsChange,
+}: Props) {
+  const [activePathIndex, setActivePathIndex] = useState(0)
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
 
   const hiddenSet = useMemo(() => new Set(hiddenCells), [hiddenCells])
+  const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
+  const safeActivePathIndex = Math.min(activePathIndex, path.length)
+  const activePath = path[safeActivePathIndex]
 
-  const cellToStep = useMemo(() => {
-    const m = new Map<string, number>()
-    for (let i = 0; i < path.length; i++)
-      for (const c of path[i].cells) m.set(k(c.row, c.col), i)
-    return m
+  const animationMode: AnimationMode = path.slice(1).some((step) => step.timing === 'simultaneous')
+    ? 'simultaneous'
+    : 'sequence'
+
+  const cellToPlacement = useMemo(() => {
+    const placements = new Map<string, { pathIndex: number; cellIndex: number; isGroup: boolean }>()
+    path.forEach((step, pathIndex) => {
+      getStepCells(step).forEach((cell, cellIndex) => {
+        placements.set(k(cell.row, cell.col), {
+          pathIndex,
+          cellIndex,
+          isGroup: step.buildAs === 'group',
+        })
+      })
+    })
+    return placements
   }, [path])
 
-  const groupStepIdx = path.findIndex((s) => s.cells.length > 1)
-  const hasGroup = groupStepIdx !== -1
+  const selectedCells = useMemo(() => (
+    selectedKeys.map((key) => {
+      const [row, col] = key.split(',').map(Number)
+      const placement = cellToPlacement.get(key)
+      if (placement) {
+        const existing = getStepCells(path[placement.pathIndex])[placement.cellIndex]
+        if (existing) return { ...existing }
+      }
+      return { row, col }
+    })
+  ), [selectedKeys, cellToPlacement, path])
 
-  const selProps = useMemo(() => {
+  const selectedProps = useMemo(() => {
     let opacity = 100
     let color = options.color
-    let glow: number | undefined
     let shape: CellShape | undefined
-    for (const key of selected) {
-      for (const step of path) {
-        for (const c of step.cells) {
-          if (k(c.row, c.col) === key) {
-            if (c.opacity != null) opacity = c.opacity
-            if (c.color) color = c.color
-            if (c.glow != null) glow = c.glow
-            if (c.shape) shape = c.shape
-          }
-        }
-      }
-    }
-    return { opacity, color, glow, shape }
-  }, [selected, path, options.color])
 
-  const handleClick = useCallback((r: number, c: number, shift: boolean) => {
-    if (hiddenSet.has(k(r, c))) return
+    for (const cell of selectedCells) {
+      opacity = cellAlpha(cell)
+      if (cell.color) color = cell.color
+      if (cell.shape) shape = cell.shape
+    }
+
+    return { opacity, color, shape }
+  }, [selectedCells, options.color])
+
+  const updatePath = useCallback((nextPath: CustomPathStep[]) => {
+    onPathChange(nextPath, generateCustomFrames(nextPath, options.gridSize))
+  }, [onPathChange, options.gridSize])
+
+  const setAnimationMode = useCallback((mode: AnimationMode) => {
+    updatePath(path.map((step, index) => ({
+      ...step,
+      timing: index === 0 ? 'sequence' : mode,
+    })))
+  }, [path, updatePath])
+
+  const toggleHiddenCell = useCallback((r: number, c: number) => {
     const key = k(r, c)
-    const inPath = cellToStep.has(key)
-    const inGroup = inPath && path[cellToStep.get(key)!].cells.length > 1
-
-    if (shift) {
-      setSelected((prev) => {
-        const next = new Set(prev)
-        if (next.has(key)) next.delete(key); else next.add(key)
-        return next
-      })
-    } else {
-      if (!inPath) {
-        const newStep: CustomPathStep = { cells: [{ row: r, col: c }] }
-        const newPath = [...path, newStep]
-        onPathChange(newPath, generateCustomFrames(newPath, options.gridSize))
-      }
-      const ents = inGroup
-        ? path[cellToStep.get(key)!].cells.map((cc) => k(cc.row, cc.col))
-        : [key]
-      setSelected(new Set(ents))
-    }
-  }, [hiddenSet, cellToStep, path, options.gridSize, onPathChange])
-
-  const handleGroup = useCallback(() => {
-    if (selected.size < 2) return
-    const cells = Array.from(selected).map((key) => {
-      const [r, c] = key.split(',').map(Number)
-      for (const step of path) {
-        for (const cc of step.cells) {
-          if (cc.row === r && cc.col === c) return { row: r, col: c, opacity: cc.opacity, color: cc.color, glow: cc.glow, shape: cc.shape }
-        }
-      }
-      return { row: r, col: c }
-    })
-
-    const removeSteps = new Set<number>()
-    for (const key of selected) {
-      const si = cellToStep.get(key)
-      if (si !== undefined) removeSteps.add(si)
-    }
-
-    const newPath = path.filter((_, i) => !removeSteps.has(i))
-    newPath.push({ cells, pattern: 'wave-lr' })
-    onPathChange(newPath, generateCustomFrames(newPath, options.gridSize))
-    setSelected(new Set())
-  }, [selected, path, cellToStep, options.gridSize, onPathChange])
-
-  const handleDirection = useCallback((dir: MovementPattern | undefined) => {
-    if (groupStepIdx === -1) return
-    const newPath = path.map((s, i) => i === groupStepIdx ? { ...s, pattern: dir } : s)
-    onPathChange(newPath, generateCustomFrames(newPath, options.gridSize))
-  }, [path, groupStepIdx, options.gridSize, onPathChange])
-
-  const handleUngroup = useCallback(() => {
-    if (groupStepIdx === -1) return
-    const s = path[groupStepIdx]
-    const newPath = path.flatMap((step, i) =>
-      i === groupStepIdx
-        ? s.cells.map((c) => ({ cells: [{ row: c.row, col: c.col, opacity: c.opacity, color: c.color, glow: c.glow, shape: c.shape }] }))
-        : [step]
+    onHiddenCellsChange(hiddenSet.has(key)
+      ? hiddenCells.filter((hidden) => hidden !== key)
+      : [...hiddenCells, key]
     )
-    onPathChange(newPath, generateCustomFrames(newPath, options.gridSize))
-    setSelected(new Set())
-  }, [path, groupStepIdx, options.gridSize, onPathChange])
+    setSelectedKeys((keys) => keys.filter((selected) => selected !== key))
+  }, [hiddenCells, hiddenSet, onHiddenCellsChange])
 
-  const updateCellProp = useCallback((val: string | number, prop: 'opacity' | 'color' | 'glow' | 'shape') => {
-    if (selected.size === 0) return
-    const newPath = path.map((step) => ({
-      ...step,
-      cells: step.cells.map((c) =>
-        selected.has(k(c.row, c.col)) ? { ...c, [prop]: val } : c
-      ),
-    }))
-    onPathChange(newPath, generateCustomFrames(newPath, options.gridSize))
-  }, [selected, path, options.gridSize, onPathChange])
+  const toggleSelectedCell = useCallback((key: string) => {
+    setSelectedKeys((keys) => (
+      keys.includes(key)
+        ? keys.filter((selected) => selected !== key)
+        : [...keys, key]
+    ))
+  }, [])
 
-  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'shape') => {
-    if (selected.size === 0) return
-    const newPath = path.map((step) => ({
+  const handleCellClick = useCallback((row: number, col: number) => {
+    const key = k(row, col)
+    if (hiddenSet.has(key)) return
+    toggleSelectedCell(key)
+    const placement = cellToPlacement.get(key)
+    if (placement) setActivePathIndex(placement.pathIndex)
+  }, [cellToPlacement, hiddenSet, toggleSelectedCell])
+
+  const withoutSelectedCells = useCallback(() => (
+    path.flatMap((step) => {
+      const cells = getStepCells(step).filter((cell) => !selectedSet.has(k(cell.row, cell.col)))
+      if (cells.length === 0) return []
+      return [{
+        ...step,
+        cells,
+        tracks: undefined,
+      }]
+    })
+  ), [path, selectedSet])
+
+  const handleAddToPath = useCallback(() => {
+    if (selectedCells.length === 0) return
+
+    const selectedIndexes = new Set(
+      selectedKeys
+        .map((key) => cellToPlacement.get(key)?.pathIndex)
+        .filter((idx): idx is number => idx !== undefined)
+    )
+
+    if (selectedIndexes.size === 1) {
+      const [index] = Array.from(selectedIndexes)
+      const allCells = getStepCells(path[index])
+      const selectedCoversPath = allCells.length === selectedCells.length
+        && allCells.every((cell) => selectedSet.has(k(cell.row, cell.col)))
+
+      if (selectedCoversPath) {
+        if (selectedCells.length >= 2) {
+          updatePath(path.map((step, stepIndex) => (
+            stepIndex === index
+              ? { ...step, cells: selectedCells, tracks: undefined, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
+              : step
+          )))
+        }
+        setActivePathIndex(index)
+        setSelectedKeys([])
+        return
+      }
+    }
+
+    const basePath = withoutSelectedCells()
+    const step: CustomPathStep = {
+      cells: selectedCells,
+      buildAs: selectedCells.length >= 2 ? 'group' : 'singles',
+      play: 'one-by-one',
+      pattern: selectedCells.length >= 2 ? 'wave-lr' : undefined,
+      timing: basePath.length === 0 ? 'sequence' : animationMode,
+    }
+
+    updatePath([...basePath, step])
+    setActivePathIndex(basePath.length)
+    setSelectedKeys([])
+  }, [animationMode, cellToPlacement, path, selectedCells, selectedKeys, selectedSet, updatePath, withoutSelectedCells])
+
+  const handleRemoveSelected = useCallback(() => {
+    if (selectedKeys.length === 0) return
+    const nextPath = withoutSelectedCells()
+    updatePath(nextPath)
+    setSelectedKeys([])
+    setActivePathIndex((index) => Math.min(index, nextPath.length))
+  }, [selectedKeys, updatePath, withoutSelectedCells])
+
+  const updateCellProp = useCallback((val: string | number, prop: 'opacity' | 'color' | 'shape') => {
+    if (selectedKeys.length === 0) return
+
+    updatePath(path.map((step) => ({
       ...step,
-      cells: step.cells.map((c) => {
-        if (!selected.has(k(c.row, c.col))) return c
-        const copy = { ...c }
+      cells: getStepCells(step).map((cell) => (
+        selectedSet.has(k(cell.row, cell.col)) ? { ...cell, [prop]: val } : cell
+      )),
+      tracks: undefined,
+    })))
+  }, [path, selectedKeys, selectedSet, updatePath])
+
+  const removeCellProp = useCallback((prop: 'color' | 'shape') => {
+    if (selectedKeys.length === 0) return
+
+    updatePath(path.map((step) => ({
+      ...step,
+      cells: getStepCells(step).map((cell) => {
+        if (!selectedSet.has(k(cell.row, cell.col))) return cell
+        const copy = { ...cell }
         delete copy[prop]
         return copy
       }),
-    }))
-    onPathChange(newPath, generateCustomFrames(newPath, options.gridSize))
-  }, [selected, path, options.gridSize, onPathChange])
+      tracks: undefined,
+    })))
+  }, [path, selectedKeys, selectedSet, updatePath])
 
-  const undo = useCallback(() => {
-    onPathChange([], [])
-    setSelected(new Set())
-  }, [onPathChange])
+  const handleMotionChange = useCallback((direction: MovementPattern | undefined) => {
+    if (!activePath) return
+    updatePath(path.map((step, index) => (
+      index === safeActivePathIndex
+        ? { ...step, pattern: direction }
+        : step
+    )))
+  }, [activePath, path, safeActivePathIndex, updatePath])
+
+  const handleUngroup = useCallback(() => {
+    if (!activePath) return
+    updatePath(path.map((step, index) => (
+      index === safeActivePathIndex
+        ? { ...step, buildAs: 'singles', pattern: undefined }
+        : step
+    )))
+  }, [activePath, path, safeActivePathIndex, updatePath])
+
+  const undoLast = useCallback(() => {
+    const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step), tracks: undefined }))
+    const index = Math.min(safeActivePathIndex, nextPath.length - 1)
+
+    if (index < 0) return
+    const step = nextPath[index]
+    const nextCells = step.cells.slice(0, -1)
+
+    if (nextCells.length === 0) nextPath.splice(index, 1)
+    else nextPath[index] = { ...step, cells: nextCells }
+
+    updatePath(nextPath)
+    setSelectedKeys([])
+    setActivePathIndex(Math.min(index, nextPath.length))
+  }, [path, safeActivePathIndex, updatePath])
 
   const clearAll = useCallback(() => {
-    onPathChange([], [])
-    setSelected(new Set())
+    updatePath([])
+    setSelectedKeys([])
+    setActivePathIndex(0)
     onHiddenCellsChange([])
-  }, [onPathChange, onHiddenCellsChange])
+  }, [onHiddenCellsChange, updatePath])
 
-  const hideCell = useCallback((r: number, c: number) => {
-    const key = k(r, c)
-    onHiddenCellsChange(hiddenSet.has(key) ? hiddenCells.filter((h) => h !== key) : [...hiddenCells, key])
-  }, [hiddenCells, hiddenSet, onHiddenCellsChange])
-
-  const ecs = Math.floor(Math.min(320 / options.gridSize - 4, 40))
-  const canGroup = selected.size >= 2
+  const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, 48))
+  const selectedCount = selectedKeys.length
+  const canCreateGroup = selectedCount > 1
+  const activeIsGroup = activePath?.buildAs === 'group'
+  const showTiming = path.length > 1
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="flex items-center gap-3">
-        <h3 className="text-sm font-medium text-zinc-300">Custom Builder</h3>
-        <button onClick={undo} disabled={path.length === 0} className="px-3 py-1 text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 disabled:opacity-30 disabled:pointer-events-none transition">Undo</button>
-        <button onClick={clearAll} disabled={path.length === 0 && hiddenCells.length === 0} className="px-3 py-1 text-xs rounded-lg border border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-500/50 disabled:opacity-30 disabled:pointer-events-none transition">Clear</button>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-        <span>{path.length} step{path.length !== 1 ? 's' : ''}</span>
-        {hasGroup && <span className="text-emerald-400">· Group active</span>}
-        <span>· Right-click to hide</span>
-        <span>· Shift+click to select</span>
-      </div>
-
-      {(selected.size > 0 || hasGroup) && (
-        <div className="w-full max-w-sm flex flex-col items-center gap-2 px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900/40">
-          {selected.size > 0 && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-zinc-400">{selected.size} selected</span>
-              <button onClick={() => setSelected(new Set())} className="px-2 py-1 text-[10px] rounded border border-zinc-700 text-zinc-500 hover:text-zinc-300 transition">Deselect</button>
-            </div>
-          )}
-
-          {canGroup && (
-            <button onClick={handleGroup} className="px-4 py-1.5 text-xs rounded-lg bg-cyan-500/15 border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/25 transition font-medium">
-              Group selected cells
-            </button>
-          )}
-
-          {hasGroup && (
-            <div className="flex flex-col items-center gap-1.5 w-full pt-1 border-t border-zinc-800">
-              <span className="text-[10px] uppercase tracking-wider text-zinc-500">Group direction</span>
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {DIRECTIONS.map((d) => {
-                  const grp = path[groupStepIdx]
-                  const active = (grp.pattern ?? undefined) === d.key
-                  return (
-                    <button
-                      key={d.label}
-                      onClick={() => handleDirection(d.key)}
-                      className={`px-2.5 py-1.5 text-xs rounded-lg border transition ${
-                        active
-                          ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.15)]'
-                          : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
-                      }`}
-                    >
-                      <span className="mr-1">{d.icon}</span>
-                      {d.label}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="flex gap-2 mt-1">
-                <button onClick={handleUngroup} className="px-3 py-1 text-[10px] rounded border border-zinc-700 text-zinc-500 hover:text-amber-400 hover:border-amber-500/50 transition">
-                  Ungroup
-                </button>
-              </div>
-            </div>
-          )}
+    <div className="custom-workspace">
+      <div className="builder-toolbar">
+        <div>
+          <p className="eyebrow">Custom builder</p>
+          <h3 className="panel-title small">Build ordered paths on the grid</h3>
         </div>
-      )}
+        <div className="builder-actions">
+          <button onClick={undoLast} disabled={path.length === 0}>Undo</button>
+          <button onClick={clearAll} disabled={path.length === 0 && hiddenCells.length === 0}>Clear</button>
+        </div>
+      </div>
 
-      {selected.size === 0 && !hasGroup && (
-        <span className="text-[11px] text-zinc-500">Click cells to animate · Shift+click to select · Group for multi-cell steps</span>
-      )}
+      <div className="builder-layout">
+        <div className="builder-canvas-wrap">
 
-      <div className="grid place-items-center select-none">
-        <div className="relative" style={{ display: 'grid', gridTemplateColumns: `repeat(${options.gridSize}, ${ecs}px)`, gap: '4px' }}>
-          {Array.from({ length: options.gridSize }, (_, r) =>
-            Array.from({ length: options.gridSize }, (_, c) => {
-              const h = hiddenSet.has(k(r, c))
-              const s = selected.has(k(r, c))
-              const si = cellToStep.get(k(r, c))
-              return (
+          <div
+            className="custom-grid"
+            style={{
+              gridTemplateColumns: `repeat(${options.gridSize}, ${editorCellSize}px)`,
+              gap: 6,
+            }}
+          >
+            {Array.from({ length: options.gridSize }, (_, row) =>
+              Array.from({ length: options.gridSize }, (_, col) => {
+                const key = k(row, col)
+                const hidden = hiddenSet.has(key)
+                const placement = cellToPlacement.get(key)
+                const isSelected = selectedSet.has(key)
+                const isActivePath = placement?.pathIndex === safeActivePathIndex
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleCellClick(row, col)}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      toggleHiddenCell(row, col)
+                    }}
+                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                    style={{ width: editorCellSize, height: editorCellSize }}
+                    aria-label={`Cell row ${row + 1}, column ${col + 1}`}
+                  >
+                    {hidden ? (
+                      <span className="cell-mask" />
+                    ) : placement ? (
+                      <span className="cell-index">{placement.cellIndex + 1}</span>
+                    ) : null}
+                  </button>
+                )
+              })
+            )}
+          </div>
+
+          <div className="builder-stats">
+            <span>{path.length} paths</span>
+            <span>{hiddenCells.length} masked</span>
+            <span>{selectedCount} selected</span>
+          </div>
+        </div>
+
+        <div className="inspector-panel">
+          <section>
+            <div className="inspector-row">
+              <p className="inspector-label">Paths</p>
+              {showTiming && (
+                <div className="mini-toggle" aria-label="Animation mode">
+                  <button
+                    onClick={() => setAnimationMode('sequence')}
+                    className={animationMode === 'sequence' ? 'is-active' : ''}
+                  >
+                    Sequence
+                  </button>
+                  <button
+                    onClick={() => setAnimationMode('simultaneous')}
+                    className={animationMode === 'simultaneous' ? 'is-active' : ''}
+                  >
+                    Simultaneous
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="path-strip">
+              {path.map((step, index) => (
                 <button
-                  key={`${r}-${c}`}
-                  onClick={(e) => handleClick(r, c, e.shiftKey)}
-                  onContextMenu={(e) => { e.preventDefault(); hideCell(r, c) }}
-                  className={`relative flex items-center justify-center rounded transition-all ${
-                    h
-                      ? 'bg-zinc-900/20 border border-dashed border-zinc-700/30'
-                      : s
-                        ? 'bg-cyan-400/25 border-2 border-cyan-400 shadow-[0_0_10px_rgba(0,212,255,0.3)]'
-                        : si !== undefined
-                          ? 'bg-cyan-400/15 border border-cyan-400/40'
-                          : 'bg-zinc-800/40 border border-zinc-700/50 hover:border-zinc-500 hover:bg-zinc-700/30'
-                  }`}
-                  style={{ width: ecs, height: ecs }}
+                  key={`${index}-${getStepCells(step).length}`}
+                  onClick={() => {
+                    setActivePathIndex(index)
+                    setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
+                  }}
+                  className={`path-chip ${index === safeActivePathIndex ? 'is-active' : ''}`}
                 >
-                  {h && <svg className="w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
-                  {si !== undefined && !h && !s && <span className="text-[10px] font-mono font-bold text-cyan-400">{si + 1}</span>}
-                  {s && <span className="text-[10px] font-mono font-bold text-white">{si !== undefined ? si + 1 : 'S'}</span>}
+                  <strong>{labelForPath(index)}</strong>
+                  <span>{getStepCells(step).length} cells</span>
+                  {step.buildAs === 'group' && <em>Group</em>}
                 </button>
-              )
-            })
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="inspector-row">
+              <p className="inspector-label">Selection</p>
+              {selectedCount > 0 && (
+                <button className="text-button" onClick={() => setSelectedKeys([])}>Deselect</button>
+              )}
+            </div>
+
+            {selectedCount === 0 ? (
+              <p className="muted-copy">Click cells to select them. Select 2+ to create a group.</p>
+            ) : (
+              <div className="selection-tools">
+                <strong>{selectedCount} cell{selectedCount === 1 ? '' : 's'} selected</strong>
+                {canCreateGroup ? (
+                  <button onClick={handleAddToPath} className="secondary-action">Create group</button>
+                ) : (
+                  <button onClick={handleAddToPath} className="secondary-action">Add to path</button>
+                )}
+                <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
+              </div>
+            )}
+          </section>
+
+          {activePath && getStepCells(activePath).length > 1 && (
+            <section>
+              <div className="inspector-row">
+                <p className="inspector-label">Motion</p>
+                {activeIsGroup && (
+                  <button className="text-button" onClick={handleUngroup}>Ungroup</button>
+                )}
+              </div>
+              {activeIsGroup ? (
+                <div className="direction-grid">
+                  {DIRECTIONS.map((direction) => (
+                    <button
+                      key={direction.label}
+                      onClick={() => handleMotionChange(direction.key)}
+                      className={activePath.pattern === direction.key ? 'is-active' : ''}
+                    >
+                      {direction.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSelectedKeys(getStepCells(activePath).map((cell) => k(cell.row, cell.col)))
+                  }}
+                  className="secondary-action"
+                >
+                  Select path cells
+                </button>
+              )}
+            </section>
           )}
-        </div>
-      </div>
 
-      {selected.size > 0 && (
-        <div className="w-full max-w-sm flex flex-col items-center gap-3 px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900/40">
-          <span className="text-[10px] uppercase tracking-wider text-zinc-500">Cell Style</span>
-
-          <label className="flex items-center gap-2 text-xs text-zinc-500 w-full justify-center">
-            Opacity
-            <input type="range" min={5} max={100} step={5} value={selProps.opacity} onChange={(e) => updateCellProp(Number(e.target.value), 'opacity')} className="w-24 accent-cyan-400" />
-            <span className="text-cyan-400 w-7 text-right text-[11px]">{selProps.opacity}%</span>
-          </label>
-
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-zinc-500">
-              Color
-              <input type="color" value={selProps.color} onChange={(e) => updateCellProp(e.target.value, 'color')} className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent" />
-            </label>
-            {selProps.color !== options.color && (
-              <button onClick={() => removeCellProp('color')} className="px-2 py-1 text-[10px] rounded border border-zinc-700 text-zinc-500 hover:text-red-400 hover:border-red-500/50 transition">
-                Reset
-              </button>
-            )}
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-zinc-500 w-full justify-center">
-            Glow
-            <input type="range" min={0} max={50} step={1} value={selProps.glow ?? options.glow} onChange={(e) => updateCellProp(Number(e.target.value), 'glow')} className="w-24 accent-cyan-400" />
-            <span className="text-cyan-400 w-10 text-right text-[11px]">{selProps.glow ?? options.glow}</span>
-            {(selProps.glow != null) && (
-              <button onClick={() => removeCellProp('glow')} className="px-2 py-1 text-[10px] rounded border border-zinc-700 text-zinc-500 hover:text-red-400 hover:border-red-500/50 transition">
-                Reset
-              </button>
-            )}
-          </label>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500">Shape</span>
-            {(['square', 'circle', 'diamond', 'triangle', 'hexagon'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => updateCellProp(s, 'shape')}
-                className={`px-3 py-1 text-xs rounded-lg border transition ${
-                  (selProps.shape ?? options.shape) === s
-                    ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
-                    : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
-                }`}
-              >
-                {s === 'square' ? '■' : s === 'circle' ? '●' : s === 'diamond' ? '◆' : s === 'triangle' ? '▲' : '⬡'}
-              </button>
-            ))}
-            {selProps.shape != null && (
-              <button onClick={() => removeCellProp('shape')} className="px-2 py-1 text-[10px] rounded border border-zinc-700 text-zinc-500 hover:text-red-400 hover:border-red-500/50 transition">
-                Reset
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-[11px] uppercase tracking-wider text-zinc-500">Preview</span>
-        <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/60">
-          <LoaderCanvas
-            options={options}
-            frames={frames.length > 0 ? frames : [Array.from({ length: options.gridSize }, () => Array(options.gridSize).fill(0))]}
-            size={200}
-            showBgGrid
-            hiddenCells={hiddenCells}
-            customPath={path}
-          />
+          {selectedCount > 0 && (
+            <section>
+              <p className="inspector-label">Cell style</p>
+              <label className="mini-slider">
+                <span>Opacity</span>
+                <input
+                  type="range"
+                  min={5}
+                  max={100}
+                  step={5}
+                  value={selectedProps.opacity}
+                  onChange={(e) => updateCellProp(Number(e.target.value), 'opacity')}
+                />
+                <strong>{selectedProps.opacity}%</strong>
+              </label>
+              <div className="inline-control">
+                <span>Color</span>
+                <input
+                  type="color"
+                  value={selectedProps.color}
+                  onChange={(e) => updateCellProp(e.target.value, 'color')}
+                  aria-label="Selected cell color"
+                />
+                {selectedProps.color !== options.color && (
+                  <button onClick={() => removeCellProp('color')}>Reset</button>
+                )}
+              </div>
+              <div className="shape-grid compact">
+                {SHAPES.map((shape) => (
+                  <button
+                    key={shape}
+                    onClick={() => updateCellProp(shape, 'shape')}
+                    className={`shape-button ${(selectedProps.shape ?? options.shape) === shape ? 'is-active' : ''}`}
+                    title={shape}
+                    aria-label={`Use ${shape} for selected cells`}
+                  >
+                    <span className={`shape-icon shape-${shape}`} />
+                  </button>
+                ))}
+                {selectedProps.shape != null && (
+                  <button className="reset-shape" onClick={() => removeCellProp('shape')}>Reset</button>
+                )}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>
