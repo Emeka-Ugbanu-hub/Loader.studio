@@ -259,6 +259,7 @@ export default function CustomPatternEditor({
         ? { ...step, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
         : step
     )))
+    setActivePathIndex(path.length)
   }, [activePath, path, safeActivePathIndex, updatePath])
 
   const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, 48))
