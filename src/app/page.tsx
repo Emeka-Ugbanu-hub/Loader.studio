@@ -1,22 +1,27 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import LoaderCanvas from '@/components/LoaderCanvas'
 import ControlsPanel from '@/components/ControlsPanel'
 import PresetGrid from '@/components/PresetGrid'
 import CustomPatternEditor from '@/components/CustomPatternEditor'
-import { patternGenerators, getPresetColor } from '@/lib/patterns'
+import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderCode } from '@/lib/exporter'
-import type { LoaderOptions, CustomPathStep } from '@/lib/types'
+import { applyTrailToFrames, getPresetColor, patternGenerators } from '@/lib/patterns'
+import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 
 const DEFAULT_OPTIONS: LoaderOptions = {
   gridSize: 5,
   cellSize: 14,
   gap: 6,
-  color: '#00d4ff',
-  glow: 18,
+  color: '#ffffff',
+  trail: false,
   speed: 8,
   shape: 'square',
+}
+
+function emptyFrame(size: number) {
+  return Array.from({ length: size }, () => Array(size).fill(0))
 }
 
 export default function Home() {
@@ -34,10 +39,24 @@ export default function Home() {
   )
 
   const activeFrames = mode === 'preset' ? presetFrames : customFrames
+  const safeFrames = useMemo(
+    () => activeFrames.length > 0 ? activeFrames : [emptyFrame(options.gridSize)],
+    [activeFrames, options.gridSize]
+  )
+  const trailedFrames = useMemo(
+    () => applyTrailToFrames(safeFrames, options.trail),
+    [safeFrames, options.trail]
+  )
   const displayOptions = useMemo(() => ({
     ...options,
     color: mode === 'preset' ? getPresetColor(selectedPreset) : options.color,
   }), [options, mode, selectedPreset])
+
+  const selectedLabel = mode === 'preset'
+    ? selectedPreset.replace(/-/g, ' ')
+    : customPath.length > 0
+      ? 'custom sequence'
+      : 'blank custom'
 
   const handleOptionsChange = useCallback((update: Partial<LoaderOptions>) => {
     setOptions((prev) => ({ ...prev, ...update }))
@@ -57,84 +76,110 @@ export default function Home() {
     setHiddenCells(hidden)
   }, [])
 
-  const switchToCustom = useCallback(() => {
-    setMode('custom')
-  }, [])
-
   const handleCopyCode = useCallback(() => {
-    const code = generateLoaderCode(displayOptions, activeFrames, mode === 'custom' ? customPath : undefined)
+    const code = generateLoaderCode(displayOptions, trailedFrames, mode === 'custom' ? customPath : undefined)
     navigator.clipboard.writeText(code).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
-  }, [activeFrames, displayOptions, mode, customPath])
+  }, [displayOptions, trailedFrames, mode, customPath])
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans">
-      <header className="border-b border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xl text-cyan-400 font-light">◆</span>
-            <h1 className="text-sm font-semibold tracking-tight">Pixel Loader Generator</h1>
+    <div className="studio-shell min-h-screen text-neutral-100">
+      <header className="studio-topbar sticky top-0 z-40">
+        <div className="mx-auto flex h-16 w-full max-w-[1520px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-4">
+            <BrandLogo />
           </div>
-          <p className="text-xs text-zinc-500 hidden sm:block">Create beautiful animated loaders</p>
+          <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-400 md:flex">
+            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+            Live preview
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          <div className="lg:w-[360px] xl:w-[400px] flex-shrink-0">
-            <div className="sticky top-20 space-y-6">
-              <div className="p-6 rounded-2xl border border-zinc-800 bg-zinc-900/50 flex items-center justify-center">
-                <LoaderCanvas
-                  options={displayOptions}
-                  frames={activeFrames.length > 0 ? activeFrames : [Array.from({ length: options.gridSize }, () => Array(options.gridSize).fill(0))]}
-                  size={280}
-                  showBgGrid
-                  showLabel
-                  label={mode === 'preset' ? selectedPreset : 'custom'}
-                  hiddenCells={hiddenCells}
-                  customPath={mode === 'custom' ? customPath : undefined}
-                />
-              </div>
+      <main className="mx-auto grid w-full max-w-[1520px] gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(330px,390px)_1fr] lg:px-8 lg:py-6">
+        <aside className="studio-panel studio-preview-panel lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)]">
+          <div className="panel-head">
+            <div>
+              <p className="eyebrow">Output</p>
+              <h2 className="panel-title">{selectedLabel}</h2>
+            </div>
+            <span className="status-pill">{trailedFrames.length} frames</span>
+          </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCopyCode}
-                  className="flex-1 px-4 py-2.5 text-sm rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition font-medium"
-                >
-                  {copied ? 'Copied!' : 'Copy Code'}
-                </button>
-              </div>
+          <div className="preview-stage">
+            <LoaderCanvas
+              options={displayOptions}
+              frames={trailedFrames}
+              size={300}
+              showBgGrid
+              hiddenCells={mode === 'custom' ? hiddenCells : []}
+              customPath={mode === 'custom' ? customPath : undefined}
+            />
+          </div>
 
-              <ControlsPanel options={options} onChange={handleOptionsChange} />
+          <div className="preview-meta">
+            <div>
+              <span>Grid</span>
+              <strong>{options.gridSize} x {options.gridSize}</strong>
+            </div>
+            <div>
+              <span>Speed</span>
+              <strong>{options.speed} fps</strong>
+            </div>
+            <div>
+              <span>Shape</span>
+              <strong>{options.shape}</strong>
+            </div>
+            <div>
+              <span>Trail</span>
+              <strong>{options.trail ? 'on' : 'off'}</strong>
             </div>
           </div>
 
-          <div className="flex-1 min-w-0 space-y-8">
-            <div className="flex items-center gap-4 border-b border-zinc-800 pb-3">
-              <button
-                onClick={() => setMode('preset')}
-                className={`text-sm font-medium pb-1 border-b-2 transition ${
-                  mode === 'preset'
-                    ? 'text-cyan-400 border-cyan-400'
-                    : 'text-zinc-500 border-transparent hover:text-zinc-300'
-                }`}
-              >
-                Presets
-              </button>
-              <button
-                onClick={switchToCustom}
-                className={`text-sm font-medium pb-1 border-b-2 transition ${
-                  mode === 'custom'
-                    ? 'text-cyan-400 border-cyan-400'
-                    : 'text-zinc-500 border-transparent hover:text-zinc-300'
-                }`}
-              >
-                Custom
-              </button>
+          <button onClick={handleCopyCode} className="primary-action">
+            {copied ? 'Code copied' : 'Copy embed code'}
+          </button>
+
+          <ControlsPanel
+            options={options}
+            onChange={handleOptionsChange}
+            colorLocked={mode === 'preset'}
+          />
+        </aside>
+
+        <section className="studio-panel min-w-0 overflow-hidden">
+          <div className="studio-hero">
+            <div className="min-w-0">
+              <p className="eyebrow">Create</p>
+              <h2 className="text-2xl font-medium text-white sm:text-3xl">Build a loader visually.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
+                Start from a polished preset or draw your own animation path. Preview, style, and export stay in one place.
+              </p>
             </div>
 
+            <div className="mode-switch" role="tablist" aria-label="Builder mode">
+              <button
+                onClick={() => setMode('preset')}
+                className={`mode-button ${mode === 'preset' ? 'is-active' : ''}`}
+                role="tab"
+                aria-selected={mode === 'preset'}
+              >
+                Preset library
+              </button>
+              <button
+                onClick={() => setMode('custom')}
+                className={`mode-button ${mode === 'custom' ? 'is-active' : ''}`}
+                role="tab"
+                aria-selected={mode === 'custom'}
+              >
+                Custom builder
+              </button>
+            </div>
+          </div>
+
+          <div className="px-3 pb-3 sm:px-5 sm:pb-5">
             {mode === 'preset' ? (
               <PresetGrid
                 options={options}
@@ -144,7 +189,7 @@ export default function Home() {
             ) : (
               <CustomPatternEditor
                 options={options}
-                frames={customFrames}
+                frames={trailedFrames}
                 path={customPath}
                 hiddenCells={hiddenCells}
                 onPathChange={handleCustomPathChange}
@@ -152,7 +197,7 @@ export default function Home() {
               />
             )}
           </div>
-        </div>
+        </section>
       </main>
     </div>
   )

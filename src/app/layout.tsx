@@ -13,8 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pixel Loader Generator",
-  description: "Create beautiful animated pixel/grid loaders with ease",
+  title: "loader.studio",
+  description: "Create polished animated pixel/grid loaders with ease",
+  icons: {
+    icon: "/loader-studio-icon.svg",
+    shortcut: "/loader-studio-icon.svg",
+    apple: "/loader-studio-icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -1,11 +1,10 @@
 import type { LoaderOptions, CustomPathStep } from './types'
 
 export function generateLoaderCode(options: LoaderOptions, frames: number[][][], customPath?: CustomPathStep[]): string {
-  const { gridSize, cellSize, gap, color, glow, speed, shape } = options
+  const { gridSize, cellSize, gap, color, speed, shape } = options
   const totalSize = gridSize * (cellSize + gap) - gap
   const framesJson = JSON.stringify(frames)
   const cellColorsJson = customPath ? buildCellColors(customPath) : 'null'
-  const cellGlowsJson = customPath ? buildCellGlows(customPath) : 'null'
   const cellShapesJson = customPath ? buildCellShapes(customPath) : 'null'
 
   return `<canvas id="loader" width="${totalSize}" height="${totalSize}"></canvas>
@@ -14,10 +13,8 @@ const canvas = document.getElementById('loader');
 const ctx = canvas.getContext('2d');
 const frames = ${framesJson};
 const cellColors = ${cellColorsJson};
-const cellGlows = ${cellGlowsJson};
 const cellShapes = ${cellShapesJson};
 const defaultColor = '${color}';
-const defaultGlow = ${glow};
 const defaultShape = '${shape}';
 let frame = 0;
 const speed = ${speed};
@@ -74,12 +71,7 @@ function draw() {
       if (alpha != null && alpha > 0) {
         const key = cellKey(r, c);
         const fillColor = (cellColors && cellColors[key]) || defaultColor;
-        const cellGlow = (cellGlows && cellGlows[key]) ?? defaultGlow;
         const cellShape = (cellShapes && cellShapes[key]) || defaultShape;
-        if (cellGlow > 0) {
-          ctx.shadowColor = fillColor;
-          ctx.shadowBlur = cellGlow;
-        }
         ctx.globalAlpha = alpha;
         ctx.fillStyle = fillColor;
         const x = c * (cellSize + gap);
@@ -100,24 +92,20 @@ draw();
 
 function buildCellColors(path: CustomPathStep[]): Record<string, string> {
   const colors: Record<string, string> = {}
-  for (const step of path)
-    for (const c of step.cells)
+  for (const step of path) {
+    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+    for (const c of cells)
       if (c.color) colors[`${c.row},${c.col}`] = c.color
+  }
   return colors
-}
-
-function buildCellGlows(path: CustomPathStep[]): Record<string, number> {
-  const glows: Record<string, number> = {}
-  for (const step of path)
-    for (const c of step.cells)
-      if (c.glow != null) glows[`${c.row},${c.col}`] = c.glow
-  return glows
 }
 
 function buildCellShapes(path: CustomPathStep[]): Record<string, string> {
   const shapes: Record<string, string> = {}
-  for (const step of path)
-    for (const c of step.cells)
+  for (const step of path) {
+    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+    for (const c of cells)
       if (c.shape) shapes[`${c.row},${c.col}`] = c.shape
+  }
   return shapes
 }

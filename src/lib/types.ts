@@ -5,7 +5,7 @@ export interface LoaderOptions {
   cellSize: number
   gap: number
   color: string
-  glow: number
+  trail: boolean
   speed: number
   shape: CellShape
 }
@@ -20,19 +20,26 @@ export interface CustomPathPoint {
   col: number
   opacity?: number
   color?: string
-  glow?: number
   shape?: CellShape
 }
 
 export type MovementPattern = 'wave-lr' | 'wave-rl' | 'wave-tb' | 'wave-bt' | 'diagonal' | 'pulse'
 
+export interface CustomParallelTrack {
+  cells: CustomPathPoint[]
+  pattern?: MovementPattern
+}
+
 export interface CustomPathStep {
   cells: CustomPathPoint[]
   opacity?: number
   color?: string
-  glow?: number
   shape?: CellShape
   pattern?: MovementPattern
+  buildAs?: 'group' | 'singles'
+  play?: 'together' | 'one-by-one'
+  timing?: 'sequence' | 'simultaneous'
+  tracks?: CustomParallelTrack[]
 }
 
 export interface HiddenCell {
@@ -44,8 +51,8 @@ export const DEFAULT_OPTIONS: LoaderOptions = {
   gridSize: 5,
   cellSize: 14,
   gap: 6,
-  color: '#00d4ff',
-  glow: 18,
+  color: '#ffffff',
+  trail: false,
   speed: 8,
   shape: 'square',
 }

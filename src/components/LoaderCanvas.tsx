@@ -40,19 +40,11 @@ export default function LoaderCanvas({
   const cellColors = useMemo(() => {
     const m = new Map<string, string>()
     if (customPath) {
-      for (const step of customPath)
-        for (const c of step.cells)
+      for (const step of customPath) {
+        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+        for (const c of cells)
           if (c.color) m.set(k(c.row, c.col), c.color)
-    }
-    return m
-  }, [customPath])
-
-  const cellGlows = useMemo(() => {
-    const m = new Map<string, number>()
-    if (customPath) {
-      for (const step of customPath)
-        for (const c of step.cells)
-          if (c.glow != null) m.set(k(c.row, c.col), c.glow)
+      }
     }
     return m
   }, [customPath])
@@ -60,16 +52,22 @@ export default function LoaderCanvas({
   const cellShapes = useMemo(() => {
     const m = new Map<string, CellShape>()
     if (customPath) {
-      for (const step of customPath)
-        for (const c of step.cells)
+      for (const step of customPath) {
+        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+        for (const c of cells)
           if (c.shape) m.set(k(c.row, c.col), c.shape)
+      }
     }
     return m
   }, [customPath])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, frame: number[][]) => {
-    const { gridSize, cellSize, gap, color, glow: globalGlow, shape: globalShape } = options
-    const totalSize = gridSize * (cellSize + gap) - gap
+    const { gridSize, cellSize, gap, color, shape: globalShape } = options
+    const baseTotalSize = gridSize * (cellSize + gap) - gap
+    const previewScale = Math.max(1, Math.min(4, (Math.min(w, h) * 0.72) / baseTotalSize))
+    const drawCellSize = cellSize * previewScale
+    const drawGap = gap * previewScale
+    const totalSize = gridSize * (drawCellSize + drawGap) - drawGap
     const ox = (w - totalSize) / 2
     const oy = (h - totalSize) / 2
     const hiddenSet = new Set(hiddenCells)
@@ -81,10 +79,10 @@ export default function LoaderCanvas({
         for (let c = 0; c < gridSize; c++) {
           if (hiddenSet.has(`${r},${c}`)) continue
           const bgShape = cellShapes.get(k(r, c)) ?? globalShape
-          const x = ox + c * (cellSize + gap)
-          const y = oy + r * (cellSize + gap)
-          ctx.fillStyle = 'rgba(255,255,255,0.04)'
-          drawCellShape(ctx, x, y, cellSize, bgShape)
+          const x = ox + c * (drawCellSize + drawGap)
+          const y = oy + r * (drawCellSize + drawGap)
+          ctx.fillStyle = 'rgba(255,255,255,0.08)'
+          drawCellShape(ctx, x, y, drawCellSize, bgShape)
         }
       }
     }
@@ -98,22 +96,17 @@ export default function LoaderCanvas({
         if (alpha != null && alpha > 0) {
           const key = k(r, c)
           const cellColor = cellColors.get(key) || color
-          const cellGlow = cellGlows.get(key) ?? globalGlow
           const cellShape = cellShapes.get(key) ?? globalShape
-          if (cellGlow > 0) {
-            ctx.shadowColor = cellColor
-            ctx.shadowBlur = cellGlow
-          }
           ctx.globalAlpha = alpha
           ctx.fillStyle = cellColor
-          const x = ox + c * (cellSize + gap)
-          const y = oy + r * (cellSize + gap)
-          drawCellShape(ctx, x, y, cellSize, cellShape)
+          const x = ox + c * (drawCellSize + drawGap)
+          const y = oy + r * (drawCellSize + drawGap)
+          drawCellShape(ctx, x, y, drawCellSize, cellShape)
         }
       }
     }
     ctx.restore()
-  }, [options, showBgGrid, hiddenCells, cellColors, cellGlows, cellShapes])
+  }, [options, showBgGrid, hiddenCells, cellColors, cellShapes])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -167,7 +160,7 @@ export default function LoaderCanvas({
         </span>
       )}
       {isActive && (
-        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-white" />
       )}
     </div>
   )

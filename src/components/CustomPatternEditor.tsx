@@ -446,36 +446,23 @@ export default function CustomPatternEditor({
             )}
           </section>
 
-          {activePath && getStepCells(activePath).length > 1 && (
+          {activePath && activeIsGroup && (
             <section>
               <div className="inspector-row">
                 <p className="inspector-label">Motion</p>
-                {activeIsGroup && (
-                  <button className="text-button" onClick={handleUngroup}>Ungroup</button>
-                )}
+                <button className="text-button" onClick={handleUngroup}>Ungroup</button>
               </div>
-              {activeIsGroup ? (
-                <div className="direction-grid">
-                  {DIRECTIONS.map((direction) => (
-                    <button
-                      key={direction.label}
-                      onClick={() => handleMotionChange(direction.key)}
-                      className={activePath.pattern === direction.key ? 'is-active' : ''}
-                    >
-                      {direction.label}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setSelectedKeys(getStepCells(activePath).map((cell) => k(cell.row, cell.col)))
-                  }}
-                  className="secondary-action"
-                >
-                  Select path cells
-                </button>
-              )}
+              <div className="direction-grid">
+                {DIRECTIONS.map((direction) => (
+                  <button
+                    key={direction.label}
+                    onClick={() => handleMotionChange(direction.key)}
+                    className={activePath.pattern === direction.key ? 'is-active' : ''}
+                  >
+                    {direction.label}
+                  </button>
+                ))}
+              </div>
             </section>
           )}
 

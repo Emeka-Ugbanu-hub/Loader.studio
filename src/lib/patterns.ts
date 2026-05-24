@@ -1,4 +1,4 @@
-import type { CustomPathPoint, CustomPathStep, MovementPattern } from './types'
+import type { CustomParallelTrack, CustomPathPoint, CustomPathStep, MovementPattern } from './types'
 
 function emptyGrid(n: number): number[][] {
   return Array.from({ length: n }, () => Array(n).fill(0))
@@ -34,12 +34,150 @@ function cellAlpha(c: CustomPathPoint, stepFallback?: number): number {
   return Math.max(0, Math.min(1, ((c.opacity ?? stepFallback ?? 100) / 100)))
 }
 
+function copyFrame(frame: number[][]): number[][] {
+  return frame.map((row) => [...row])
+}
+
+function frameFromRevealed(revealed: Map<string, number>, gridSize: number): number[][] {
+  const frame = emptyGrid(gridSize)
+  for (const [key, val] of revealed) {
+    const [r, c] = key.split(',').map(Number)
+    frame[r][c] = Math.max(frame[r][c], val)
+  }
+  return frame
+}
+
+function mergeFrame(base: number[][], overlay: number[][]): number[][] {
+  const next = copyFrame(base)
+  for (let r = 0; r < overlay.length; r++) {
+    for (let c = 0; c < overlay[r].length; c++) {
+      next[r][c] = Math.max(next[r][c], overlay[r][c])
+    }
+  }
+  return next
+}
+
+function trackToFrames(track: CustomParallelTrack, gridSize: number, stepFallback?: number): number[][][] {
+  const frames: number[][][] = []
+  const cells = track.cells
+
+  if (!track.pattern || cells.length <= 1) {
+    const revealed = new Map<string, number>()
+    for (const c of cells) {
+      revealed.set(`${c.row},${c.col}`, cellAlpha(c, stepFallback))
+      frames.push(frameFromRevealed(revealed, gridSize))
+    }
+    return frames.length > 0 ? frames : [emptyGrid(gridSize)]
+  }
+
+  for (const group of getPatternGroups(cells, track.pattern)) {
+    const frame = emptyGrid(gridSize)
+    for (const c of group) frame[c.row][c.col] = cellAlpha(c, stepFallback)
+    frames.push(frame)
+  }
+
+  return frames.length > 0 ? frames : [emptyGrid(gridSize)]
+}
+
+function cellsToSequenceFrames(cells: CustomPathPoint[], gridSize: number, stepFallback?: number): number[][][] {
+  const frames: number[][][] = []
+  const revealed = new Map<string, number>()
+
+  for (const c of cells) {
+    revealed.set(`${c.row},${c.col}`, cellAlpha(c, stepFallback))
+    frames.push(frameFromRevealed(revealed, gridSize))
+  }
+
+  return frames.length > 0 ? frames : [emptyGrid(gridSize)]
+}
+
+function cellsToTogetherFrame(cells: CustomPathPoint[], gridSize: number, stepFallback?: number): number[][][] {
+  const frame = emptyGrid(gridSize)
+  for (const c of cells) frame[c.row][c.col] = cellAlpha(c, stepFallback)
+  return [frame]
+}
+
+function layerToFrames(step: CustomPathStep, gridSize: number): number[][][] {
+  const cells = step.cells
+  if (cells.length === 0) return [emptyGrid(gridSize)]
+
+  if (step.buildAs === 'singles') {
+    return step.play === 'together'
+      ? cellsToTogetherFrame(cells, gridSize, step.opacity)
+      : cellsToSequenceFrames(cells, gridSize, step.opacity)
+  }
+
+  if (step.play === 'together') {
+    return cellsToTogetherFrame(cells, gridSize, step.opacity)
+  }
+
+  if (step.pattern) {
+    return trackToFrames({ cells, pattern: step.pattern }, gridSize, step.opacity)
+  }
+
+  return cellsToSequenceFrames(cells, gridSize, step.opacity)
+}
+
+function compositeBlock(
+  layers: CustomPathStep[],
+  revealed: Map<string, number>,
+  gridSize: number
+): number[][][] {
+  const baseFrame = frameFromRevealed(revealed, gridSize)
+  const layerFrames = layers.map((layer) => layerToFrames(layer, gridSize))
+  const longest = Math.max(...layerFrames.map((frames) => frames.length))
+
+  return Array.from({ length: longest }, (_, frameIndex) => (
+    layerFrames.reduce(
+      (merged, frames) => mergeFrame(merged, frames[frameIndex % frames.length]),
+      copyFrame(baseFrame)
+    )
+  ))
+}
+
+function revealLayer(layer: CustomPathStep, revealed: Map<string, number>) {
+  for (const c of layer.cells) revealed.set(`${c.row},${c.col}`, cellAlpha(c, layer.opacity))
+}
+
 function pathToFrames(path: CustomPathStep[], gridSize: number): number[][][] {
   const frames: number[][][] = []
   const revealed = new Map<string, number>()
 
   for (let i = 0; i < path.length; i++) {
     const step = path[i]
+    if (step.buildAs) {
+      const layers = [step]
+      while (i + 1 < path.length && path[i + 1].timing === 'simultaneous') {
+        layers.push(path[i + 1])
+        i++
+      }
+
+      frames.push(...compositeBlock(layers, revealed, gridSize))
+      for (const layer of layers) revealLayer(layer, revealed)
+      continue
+    }
+
+    const parallelTracks = step.tracks?.filter((track) => track.cells.length > 0) ?? []
+
+    if (step.timing === 'simultaneous' && parallelTracks.length > 0) {
+      const baseFrame = frameFromRevealed(revealed, gridSize)
+      const trackFrames = parallelTracks.map((track) => trackToFrames(track, gridSize, step.opacity))
+      const longest = Math.max(...trackFrames.map((track) => track.length))
+
+      for (let frameIndex = 0; frameIndex < longest; frameIndex++) {
+        const frame = trackFrames.reduce(
+          (merged, track) => mergeFrame(merged, track[frameIndex % track.length]),
+          copyFrame(baseFrame)
+        )
+        frames.push(frame)
+      }
+
+      for (const track of parallelTracks) {
+        for (const c of track.cells) revealed.set(`${c.row},${c.col}`, cellAlpha(c, step.opacity))
+      }
+      continue
+    }
+
     const newCells = step.cells.filter(c => !revealed.has(`${c.row},${c.col}`))
 
     if (!step.pattern || newCells.length <= 1) {
@@ -71,6 +209,48 @@ function pointToStep(p: CustomPathPoint): CustomPathStep {
 export function generateCustomFrames(path: CustomPathStep[], gridSize: number): number[][][] {
   if (path.length === 0) return [emptyGrid(gridSize)]
   return pathToFrames(path, gridSize)
+}
+
+function motionFrame(frames: number[][][], frameIndex: number): number[][] {
+  const frame = frames[frameIndex]
+  const previous = frames[frameIndex - 1]
+  const next = emptyGrid(frame.length)
+
+  for (let r = 0; r < frame.length; r++) {
+    for (let c = 0; c < frame[r].length; c++) {
+      const currentAlpha = frame[r][c] ?? 0
+      const previousAlpha = previous?.[r]?.[c] ?? 0
+      const isNewOrBrighter = currentAlpha > previousAlpha
+      const isMovingFrame = previous ? currentAlpha > 0 && previousAlpha === 0 : currentAlpha > 0
+      next[r][c] = isNewOrBrighter || isMovingFrame ? currentAlpha : 0
+    }
+  }
+
+  return next
+}
+
+export function applyTrailToFrames(frames: number[][][], trail: boolean): number[][][] {
+  if (!trail || frames.length <= 1) return frames
+
+  const trailLength = Math.min(5, Math.max(2, Math.ceil(frames.length / 4)))
+  const motionFrames = frames.map((_, frameIndex) => motionFrame(frames, frameIndex))
+
+  return frames.map((frame, frameIndex) => {
+    const next = copyFrame(motionFrames[frameIndex])
+    for (let offset = 1; offset <= trailLength; offset++) {
+      const source = motionFrames[frameIndex - offset]
+      if (!source) continue
+      const strength = (trailLength - offset + 1) / (trailLength + 1)
+      const opacity = strength * 0.62
+
+      for (let r = 0; r < source.length; r++) {
+        for (let c = 0; c < source[r].length; c++) {
+          next[r][c] = Math.max(next[r][c], source[r][c] * opacity)
+        }
+      }
+    }
+    return next
+  })
 }
 
 export const patternGenerators: Record<string, (n: number) => number[][][]> = {
@@ -246,24 +426,6 @@ export const patternGenerators: Record<string, (n: number) => number[][][]> = {
 export const presetNames = Object.keys(patternGenerators)
 
 export function getPresetColor(name: string): string {
-  const colors: Record<string, string> = {
-    spiral: '#00d4ff',
-    corners: '#ffeaa7',
-    plus: '#ff4757',
-    triangle: '#ffeaa7',
-    'wave-lr': '#ffeaa7',
-    'wave-tb': '#ff4757',
-    'wave-rl': '#00d4ff',
-    'tl-br': '#ffeaa7',
-    'i-left': '#ff4757',
-    'left-right': '#00d4ff',
-    striangle: '#00d4ff',
-    scorners: '#ffeaa7',
-    pulse: '#00d4ff',
-    diagonal: '#ffeaa7',
-    fill: '#00d4ff',
-    snake: '#ff4757',
-    cross: '#ffeaa7',
-  }
-  return colors[name] ?? '#00d4ff'
+  void name
+  return '#ffffff'
 }
