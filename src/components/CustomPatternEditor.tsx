@@ -158,7 +158,6 @@ export default function CustomPatternEditor({
     const placement = cellToPlacement.get(key)
     if (placement) {
       setActivePathIndex(placement.pathIndex)
-      setSelectedKeys([key])
       return
     }
 
