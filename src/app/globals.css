@@ -681,15 +681,8 @@ button:disabled {
 }
 
 .builder-cell.is-outside-layout {
-  border-color: rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.015);
-  color: transparent;
+  visibility: hidden;
   pointer-events: none;
-  cursor: default;
-}
-
-.builder-cell.is-outside-layout .cell-index {
-  display: none;
 }
 
 .builder-cell.is-group .cell-index {

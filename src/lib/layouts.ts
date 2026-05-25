@@ -32,14 +32,14 @@ export function getGridCellPosition(
       return {
         x: col * step,
         y: row * step,
-        visible: Math.sqrt(dx * dx + dy * dy) <= center + 0.1,
+        visible: dx * dx + dy * dy <= center * center + 0.1,
       }
     }
     case 'triangle': {
       return {
         x: col * step,
         y: row * step,
-        visible: col <= row + gridSize / 2 && col >= -row + gridSize / 2 - 1 && row < gridSize,
+        visible: row + col <= gridSize - 1,
       }
     }
     case 'diamond': {
@@ -47,17 +47,18 @@ export function getGridCellPosition(
       return {
         x: col * step,
         y: row * step,
-        visible: Math.abs(col - center) + Math.abs(row - center) <= center + 0.1,
+        visible: Math.abs(col - center) + Math.abs(row - center) <= center + 0.5,
       }
     }
     case 'hex': {
       const center = (gridSize - 1) / 2
       const q = col - center
       const r = row - center
+      const s = -(q + r)
       return {
         x: col * step,
         y: row * step,
-        visible: Math.abs(q) <= center && Math.abs(r) <= center && Math.abs(q + r) <= center + 0.1,
+        visible: Math.max(Math.abs(q), Math.abs(r), Math.abs(s)) <= center + 0.1,
       }
     }
     default:
