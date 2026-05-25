@@ -91,7 +91,8 @@ export default function Home() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [options, mode, selectedPreset, customPath, hiddenCells, draftStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, mode, selectedPreset, customPath, hiddenCells])
 
   const handleClearDraft = useCallback(() => {
     try { localStorage.removeItem(DRAFT_KEY) } catch {}
