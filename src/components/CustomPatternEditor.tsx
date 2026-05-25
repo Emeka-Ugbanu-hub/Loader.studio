@@ -223,20 +223,6 @@ export default function CustomPatternEditor({
     )))
   }, [activePath, path, safeActivePathIndex, updatePath])
 
-  const applyToAll = useCallback(() => {
-    updatePath(path.map((step) => ({
-      ...step,
-      cells: getStepCells(step).map((cell) => ({
-        ...cell,
-        opacity: selectedProps.opacity !== 100 ? selectedProps.opacity : undefined,
-        color: selectedProps.color !== options.color ? selectedProps.color : undefined,
-        glow: selectedProps.glow !== options.glow ? selectedProps.glow : undefined,
-        shape: selectedProps.shape,
-      })),
-      tracks: undefined,
-    })))
-  }, [options.color, options.glow, path, selectedProps, updatePath])
-
   const undoLast = useCallback(() => {
     const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step), tracks: undefined }))
     const index = Math.min(safeActivePathIndex, nextPath.length - 1)
@@ -403,7 +389,6 @@ export default function CustomPatternEditor({
                 Clear
               </button>
               </div>
-              <button onClick={applyToAll} className="secondary-action">Apply to all animated cells</button>
             </section>
 
           <section>
