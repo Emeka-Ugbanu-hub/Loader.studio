@@ -260,55 +260,19 @@ export default function CustomPatternEditor({
   const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, 48))
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
-  const showCreateGroup = selectedCount > 1
+  const showCreateGroup = activePath && !activeIsGroup && getStepCells(activePath).length > 1
   const showTiming = path.length > 1
 
   const handleCreateGroup = useCallback(() => {
-    if (selectedCount < 2) return
-
-    const keySet = new Set(selectedKeys)
-    const selectedIndexes = new Set(
-      selectedKeys
-        .map((key) => cellToPlacement.get(key)?.pathIndex)
-        .filter((idx): idx is number => idx !== undefined)
-    )
-
-    if (selectedIndexes.size === 1) {
-      const [index] = Array.from(selectedIndexes)
-      const allCells = getStepCells(path[index])
-      const selectedCoversPath = allCells.length === selectedCells.length
-        && allCells.every((cell) => keySet.has(k(cell.row, cell.col)))
-
-      if (selectedCoversPath) {
-        updatePath(path.map((step, stepIndex) => (
-          stepIndex === index
-            ? { ...step, cells: selectedCells, tracks: undefined, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
-            : step
-        )))
-        setActivePathIndex(index)
-        setSelectedKeys([])
-        return
-      }
-    }
-
-    const basePath = path.flatMap((step) => {
-      const remaining = getStepCells(step).filter((cell) => !keySet.has(k(cell.row, cell.col)))
-      if (remaining.length === 0) return []
-      return [{ ...step, cells: remaining, tracks: undefined }]
-    })
-
-    const step: CustomPathStep = {
-      cells: selectedCells,
-      buildAs: 'group',
-      play: 'one-by-one',
-      pattern: 'wave-lr',
-      timing: basePath.length === 0 ? 'sequence' : animationMode,
-    }
-
-    updatePath([...basePath, step])
-    setActivePathIndex(basePath.length)
+    if (!activePath) return
+    updatePath(path.map((step, index) => (
+      index === safeActivePathIndex
+        ? { ...step, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
+        : step
+    )))
     setSelectedKeys([])
-  }, [animationMode, cellToPlacement, path, selectedCells, selectedCount, selectedKeys, updatePath])
+    setActivePathIndex(path.length)
+  }, [activePath, path, safeActivePathIndex, updatePath])
 
   return (
     <div className="custom-workspace">
