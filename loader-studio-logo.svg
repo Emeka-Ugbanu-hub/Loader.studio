@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" width="400" height="100">
+  <g transform="translate(30, 50)">
+    <rect x="19" y="-2" width="4" height="4" fill="#000000" />
+    <rect x="16.07" y="5.07" width="4" height="4" fill="#000000" />
+    <rect x="9" y="8" width="4" height="4" fill="#000000" />
+    <rect x="1.93" y="5.07" width="4" height="4" fill="#000000" />
+    <rect x="1.93" y="-9.07" width="4" height="4" fill="#000000" />
+    <rect x="9" y="-12" width="4" height="4" fill="#000000" />
+    <rect x="16.07" y="-9.07" width="4" height="4" fill="#000000" />
+    <rect x="9" y="-2" width="4" height="4" fill="#000000" opacity="0.85" />
+  </g>
+  <text x="75" y="58" font-family="'Courier New', Courier, monospace" font-size="28" font-weight="bold" fill="#000000" letter-spacing="1">
+    loader<tspan fill="#000000">.studio</tspan>
+  </text>
+</svg>
