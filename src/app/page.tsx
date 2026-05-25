@@ -1,14 +1,24 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LoaderCanvas from '@/components/LoaderCanvas'
 import ControlsPanel from '@/components/ControlsPanel'
 import PresetGrid from '@/components/PresetGrid'
 import CustomPatternEditor from '@/components/CustomPatternEditor'
 import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderCode } from '@/lib/exporter'
-import { applyTrailToFrames, getPresetColor, patternGenerators } from '@/lib/patterns'
+import { applyTrailToFrames, generateCustomFrames, getPresetColor, patternGenerators } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
+
+const DRAFT_KEY = 'loader-studio:draft:v1'
+
+interface DraftData {
+  options: LoaderOptions
+  mode: 'preset' | 'custom'
+  selectedPreset: string
+  customPath: CustomPathStep[]
+  hiddenCells: string[]
+}
 
 const DEFAULT_OPTIONS: LoaderOptions = {
   gridSize: 5,
@@ -33,6 +43,60 @@ export default function Home() {
   const [customFrames, setCustomFrames] = useState<number[][][]>([])
   const [hiddenCells, setHiddenCells] = useState<string[]>([])
   const [copied, setCopied] = useState(false)
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saved' | 'restored'>('idle')
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (!raw) return
+      const draft: DraftData = JSON.parse(raw)
+      /* eslint-disable react-hooks/set-state-in-effect */
+      if (draft.options) setOptions(draft.options)
+      if (draft.mode) setMode(draft.mode)
+      if (draft.selectedPreset) setSelectedPreset(draft.selectedPreset)
+      if (draft.customPath) {
+        setCustomPath(draft.customPath)
+        setCustomFrames(generateCustomFrames(draft.customPath, draft.options?.gridSize ?? DEFAULT_OPTIONS.gridSize))
+      }
+      if (draft.hiddenCells) setHiddenCells(draft.hiddenCells)
+      /* eslint-enable react-hooks/set-state-in-effect */
+      setTimeout(() => setDraftStatus('restored'), 0)
+    } catch {
+      // ignore corrupted drafts
+    }
+  }, [])
+
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (draftStatus === 'restored' && !restoredRef.current) {
+      restoredRef.current = true
+      const timer = setTimeout(() => setDraftStatus('idle'), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [draftStatus])
+
+  useEffect(() => {
+    if (draftStatus === 'restored') return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      const draft: DraftData = { options, mode, selectedPreset, customPath, hiddenCells }
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+        setDraftStatus('saved')
+      } catch {
+        // quota exceeded or storage unavailable
+      }
+    }, 600)
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [options, mode, selectedPreset, customPath, hiddenCells, draftStatus])
+
+  const handleClearDraft = useCallback(() => {
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
+    setDraftStatus('idle')
+  }, [])
 
   const presetFrames = useMemo(
     () => patternGenerators[selectedPreset]?.(options.gridSize) ?? [],
@@ -93,8 +157,8 @@ export default function Home() {
             <BrandLogo />
           </div>
           <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-400 md:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-white" />
-            Live preview
+            <span className={`h-1.5 w-1.5 rounded-full ${draftStatus === 'saved' || draftStatus === 'restored' ? 'bg-emerald-400' : 'bg-white/40'}`} />
+            {draftStatus === 'restored' ? 'Restored draft' : draftStatus === 'saved' ? 'Saved' : 'Live preview'}
           </div>
         </div>
       </header>
@@ -150,7 +214,7 @@ export default function Home() {
           />
         </aside>
 
-        <section className="studio-panel min-w-0 overflow-hidden">
+        <section className="studio-panel studio-builder-panel min-w-0 overflow-hidden">
           <div className="studio-hero">
             <div className="min-w-0">
               <p className="eyebrow">Create</p>
@@ -195,6 +259,7 @@ export default function Home() {
                 hiddenCells={hiddenCells}
                 onPathChange={handleCustomPathChange}
                 onHiddenCellsChange={handleHiddenCellsChange}
+                onClearDraft={handleClearDraft}
               />
             )}
           </div>

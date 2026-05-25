@@ -1186,6 +1186,11 @@ button:disabled {
   .studio-preview-panel {
     position: relative;
     padding: 14px;
+    order: 2;
+  }
+
+  .studio-builder-panel {
+    order: 1;
   }
 
   .preview-stage {
@@ -1226,6 +1231,29 @@ button:disabled {
     max-width: 100%;
     overflow: auto;
     padding: 2px;
+  }
+
+  .builder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .path-chip {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .path-chip em,
+  .path-chip-controls,
+  .timing-toggle {
+    grid-column: 3;
+  }
+
+  .path-actions {
+    flex-direction: column;
+  }
+
+  .path-action-primary {
+    width: 100%;
   }
 
   .shape-grid.compact {

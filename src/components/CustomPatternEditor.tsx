@@ -11,6 +11,7 @@ interface Props {
   hiddenCells: string[]
   onPathChange: (path: CustomPathStep[], frames: number[][][]) => void
   onHiddenCellsChange: (hidden: string[]) => void
+  onClearDraft?: () => void
 }
 
 function k(r: number, c: number) {
@@ -47,6 +48,7 @@ export default function CustomPatternEditor({
   hiddenCells,
   onPathChange,
   onHiddenCellsChange,
+  onClearDraft,
 }: Props) {
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
@@ -526,6 +528,14 @@ export default function CustomPatternEditor({
               >
                 Clear all
               </button>
+              {onClearDraft && (
+                <button
+                  className="path-action-secondary"
+                  onClick={onClearDraft}
+                >
+                  Clear draft
+                </button>
+              )}
               </div>
             </section>
 
