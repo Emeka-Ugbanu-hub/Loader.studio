@@ -1,4 +1,5 @@
 export type CellShape = 'square' | 'circle' | 'diamond' | 'triangle' | 'hexagon'
+export type GridLayout = 'square' | 'honeycomb' | 'circle' | 'triangle' | 'diamond' | 'hex'
 
 export interface LoaderOptions {
   gridSize: number
@@ -9,6 +10,7 @@ export interface LoaderOptions {
   speed: number
   glow: number
   shape: CellShape
+  gridLayout: GridLayout
 }
 
 export interface Pattern {
@@ -59,4 +61,5 @@ export const DEFAULT_OPTIONS: LoaderOptions = {
   speed: 8,
   glow: 0,
   shape: 'square',
+  gridLayout: 'square',
 }
