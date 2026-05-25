@@ -846,6 +846,56 @@ button:disabled {
   color: #f4f4f5;
 }
 
+.timing-summary {
+  color: #66666e;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 4px 0;
+  text-align: center;
+}
+
+.grid-hint {
+  color: #55555d;
+  font-size: 11px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.scope-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.scope-button {
+  flex: 1;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  color: #8e8e97;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.scope-button:hover {
+  border-color: rgba(255,255,255,0.28);
+  color: #fff;
+}
+
+.scope-button.is-active {
+  border-color: rgba(255,255,255,0.32);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.scope-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .path-actions {
   display: flex;
   flex-wrap: wrap;

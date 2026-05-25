@@ -50,6 +50,7 @@ export default function CustomPatternEditor({
 }: Props) {
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [styleScope, setStyleScope] = useState<'selected' | 'path' | 'all'>('selected')
 
   const hiddenSet = useMemo(() => new Set(hiddenCells), [hiddenCells])
   const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
@@ -178,32 +179,43 @@ export default function CustomPatternEditor({
     setActivePathIndex((index) => Math.min(index, nextPath.length))
   }, [selectedKeys, updatePath, withoutSelectedCells])
 
+  const scopeKeys = useMemo(() => {
+    if (styleScope === 'selected') return new Set(selectedKeys)
+    if (styleScope === 'path' && activePath) {
+      return new Set(getStepCells(activePath).map((cell) => k(cell.row, cell.col)))
+    }
+    if (styleScope === 'all') {
+      return new Set(path.flatMap((step) => getStepCells(step).map((cell) => k(cell.row, cell.col))))
+    }
+    return new Set<string>()
+  }, [activePath, path, selectedKeys, styleScope])
+
   const updateCellProp = useCallback((val: string | number, prop: 'opacity' | 'color' | 'glow' | 'shape') => {
-    if (selectedKeys.length === 0) return
+    if (scopeKeys.size === 0) return
 
     updatePath(path.map((step) => ({
       ...step,
       cells: getStepCells(step).map((cell) => (
-        selectedSet.has(k(cell.row, cell.col)) ? { ...cell, [prop]: val } : cell
+        scopeKeys.has(k(cell.row, cell.col)) ? { ...cell, [prop]: val } : cell
       )),
       tracks: undefined,
     })))
-  }, [path, selectedKeys, selectedSet, updatePath])
+  }, [path, scopeKeys, updatePath])
 
   const removeCellProp = useCallback((prop: 'color' | 'glow' | 'shape') => {
-    if (selectedKeys.length === 0) return
+    if (scopeKeys.size === 0) return
 
     updatePath(path.map((step) => ({
       ...step,
       cells: getStepCells(step).map((cell) => {
-        if (!selectedSet.has(k(cell.row, cell.col))) return cell
+        if (!scopeKeys.has(k(cell.row, cell.col))) return cell
         const copy = { ...cell }
         delete copy[prop]
         return copy
       }),
       tracks: undefined,
     })))
-  }, [path, selectedKeys, selectedSet, updatePath])
+  }, [path, scopeKeys, updatePath])
 
   const handleMotionChange = useCallback((direction: MovementPattern | undefined) => {
     if (!activePath) return
@@ -249,18 +261,54 @@ export default function CustomPatternEditor({
   const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, 48))
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
-  const showCreateGroup = activePath && !activeIsGroup && getStepCells(activePath).length > 1
+  const showCreateGroup = selectedCount >= 2
 
   const handleCreateGroup = useCallback(() => {
-    if (!activePath) return
-    updatePath(path.map((step, index) => (
-      index === safeActivePathIndex
-        ? { ...step, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
-        : step
-    )))
+    if (selectedCount < 2) return
+
+    const keySet = new Set(selectedKeys)
+    const selectedIndexes = new Set(
+      selectedKeys
+        .map((key) => cellToPlacement.get(key)?.pathIndex)
+        .filter((idx): idx is number => idx !== undefined)
+    )
+
+    if (selectedIndexes.size === 1) {
+      const [index] = Array.from(selectedIndexes)
+      const allCells = getStepCells(path[index])
+      const selectedCoversPath = allCells.length === selectedCells.length
+        && allCells.every((cell) => keySet.has(k(cell.row, cell.col)))
+
+      if (selectedCoversPath) {
+        updatePath(path.map((step, stepIndex) => (
+          stepIndex === index
+            ? { ...step, cells: selectedCells, tracks: undefined, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
+            : step
+        )))
+        setActivePathIndex(index)
+        setSelectedKeys([])
+        return
+      }
+    }
+
+    const basePath = path.flatMap((step) => {
+      const remaining = getStepCells(step).filter((cell) => !keySet.has(k(cell.row, cell.col)))
+      if (remaining.length === 0) return []
+      return [{ ...step, cells: remaining, tracks: undefined }]
+    })
+
+    const step: CustomPathStep = {
+      cells: selectedCells,
+      buildAs: 'group',
+      play: 'one-by-one',
+      pattern: 'wave-lr',
+      timing: basePath.length === 0 ? 'sequence' : 'sequence',
+    }
+
+    updatePath([...basePath, step])
+    setActivePathIndex(basePath.length)
     setSelectedKeys([])
-    setActivePathIndex(path.length)
-  }, [activePath, path, safeActivePathIndex, updatePath])
+  }, [cellToPlacement, path, selectedCells, selectedCount, selectedKeys, updatePath])
 
   const toggleStepTiming = useCallback((index: number) => {
     updatePath(path.map((step, stepIndex) => (
@@ -269,6 +317,19 @@ export default function CustomPatternEditor({
         : step
     )))
   }, [path, updatePath])
+
+  const timingSummary = useMemo(() => {
+    if (path.length === 0) return ''
+    const blocks: string[][] = [[labelForPath(0)]]
+    for (let i = 1; i < path.length; i++) {
+      if (path[i].timing === 'simultaneous') {
+        blocks[blocks.length - 1].push(labelForPath(i))
+      } else {
+        blocks.push([labelForPath(i)])
+      }
+    }
+    return blocks.map((b) => b.join(' + ')).join(' \u2192 ')
+  }, [path])
 
   return (
     <div className="custom-workspace">
@@ -320,10 +381,15 @@ export default function CustomPatternEditor({
             )}
           </div>
 
+          <p className="grid-hint">Click empty cells to build. Click numbered cells to edit.</p>
+
           <div className="builder-stats">
             <span>{path.length} paths</span>
             <span>{hiddenCells.length} masked</span>
             <span>{selectedCount} selected</span>
+            {selectedCount > 0 && (
+              <button className="text-button" onClick={() => setSelectedKeys([])}>Deselect</button>
+            )}
           </div>
         </div>
 
@@ -355,14 +421,18 @@ export default function CustomPatternEditor({
                         e.stopPropagation()
                         toggleStepTiming(index)
                       }}
-                      title={step.timing === 'simultaneous' ? 'Start: Together — click to change' : 'Start: After previous — click to change'}
+                      title="Toggle start timing"
                     >
-                      {step.timing === 'simultaneous' ? 'Together' : 'After'}
+                      Start: {step.timing === 'simultaneous' ? 'Together' : 'After prev'}
                     </button>
                   )}
                 </div>
               ))}
             </div>
+
+            {timingSummary && (
+              <p className="timing-summary">{timingSummary}</p>
+            )}
 
             <div className="path-actions">
               <button
@@ -386,7 +456,7 @@ export default function CustomPatternEditor({
                 onClick={clearAll}
                 disabled={path.length === 0 && hiddenCells.length === 0}
               >
-                Clear
+                Clear all
               </button>
               </div>
             </section>
@@ -406,7 +476,7 @@ export default function CustomPatternEditor({
                 {showCreateGroup && (
                   <button onClick={handleCreateGroup} className="secondary-action">Create group</button>
                 )}
-                {selectedCount > 0 && (
+          {(selectedCount > 0 || path.length > 0) && (
                   <>
                     <strong>{selectedCount} selected</strong>
                     <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
@@ -438,7 +508,19 @@ export default function CustomPatternEditor({
 
           {selectedCount > 0 && (
             <section>
-              <p className="inspector-label">Cell style</p>
+              <p className="inspector-label">Selected style</p>
+              <div className="scope-toggle">
+                {(['selected', 'path', 'all'] as const).map((scope) => (
+                  <button
+                    key={scope}
+                    onClick={() => setStyleScope(scope)}
+                    className={`scope-button ${styleScope === scope ? 'is-active' : ''}`}
+                    disabled={scope === 'path' && !activePath}
+                  >
+                    {scope === 'selected' ? 'Selected' : scope === 'path' ? 'Path' : 'All animated'}
+                  </button>
+                ))}
+              </div>
               <label className="mini-slider">
                 <span>Opacity</span>
                 <input

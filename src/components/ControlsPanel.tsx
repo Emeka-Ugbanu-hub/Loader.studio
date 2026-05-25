@@ -16,7 +16,7 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
       <div className="panel-head compact">
         <div>
           <p className="eyebrow">Style</p>
-          <h3 className="panel-title small">Global settings</h3>
+          <h3 className="panel-title small">Default style</h3>
         </div>
       </div>
 
