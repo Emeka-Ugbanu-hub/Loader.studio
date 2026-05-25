@@ -486,7 +486,6 @@ export default function CustomPatternEditor({
                     onClick={() => {
                       setActivePathIndex(index)
                       setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
-                      setReversedIndex(null)
                     }}
                   >
                     <strong>{labelForPath(index)}</strong>
