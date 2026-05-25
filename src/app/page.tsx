@@ -149,6 +149,17 @@ export default function Home() {
     })
   }, [displayOptions, trailedFrames, mode, customPath, hiddenCells])
 
+  const handleDownloadSVG = useCallback(() => {
+    const svg = generateLoaderSVG(displayOptions, trailedFrames, mode === 'custom' ? customPath : undefined, hiddenCells)
+    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'loader.svg'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [displayOptions, trailedFrames, mode, customPath, hiddenCells])
+
   return (
     <div className="studio-shell min-h-screen text-neutral-100">
       <header className="studio-topbar sticky top-0 z-40">
@@ -205,6 +216,9 @@ export default function Home() {
 
           <button onClick={handleCopySVG} className="primary-action">
             {copied ? 'SVG copied' : 'Copy animated SVG'}
+          </button>
+          <button onClick={handleDownloadSVG} className="primary-action" style={{ marginTop: 8 }}>
+            Download SVG
           </button>
 
           <ControlsPanel
