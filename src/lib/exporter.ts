@@ -1,7 +1,7 @@
 import type { LoaderOptions, CustomPathStep } from './types'
 
 export function generateLoaderCode(options: LoaderOptions, frames: number[][][], customPath?: CustomPathStep[]): string {
-  const { gridSize, cellSize, gap, color, speed, shape } = options
+  const { gridSize, cellSize, gap, color, speed, glow, shape } = options
   const totalSize = gridSize * (cellSize + gap) - gap
   const framesJson = JSON.stringify(frames)
   const cellColorsJson = customPath ? buildCellColors(customPath) : 'null'
@@ -17,6 +17,7 @@ const cellColors = ${cellColorsJson};
 const cellShapes = ${cellShapesJson};
 const cellGlows = ${cellGlowsJson};
 const defaultColor = '${color}';
+const defaultGlow = ${glow};
 const defaultShape = '${shape}';
 let frame = 0;
 const speed = ${speed};
@@ -74,7 +75,7 @@ function draw() {
         const key = cellKey(r, c);
         const fillColor = (cellColors && cellColors[key]) || defaultColor;
         const cellShape = (cellShapes && cellShapes[key]) || defaultShape;
-        const g = (cellGlows && cellGlows[key]) || 0;
+        const g = (cellGlows && cellGlows[key]) != null ? cellGlows[key] : defaultGlow;
         ctx.globalAlpha = alpha;
         ctx.fillStyle = fillColor;
         if (g > 0) { ctx.shadowBlur = g * 2; ctx.shadowColor = fillColor; }

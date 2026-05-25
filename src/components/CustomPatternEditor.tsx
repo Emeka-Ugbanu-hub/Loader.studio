@@ -85,7 +85,7 @@ export default function CustomPatternEditor({
   const selectedProps = useMemo(() => {
     let opacity = 100
     let color = options.color
-    let glow = 0
+    let glow = options.glow
     let shape: CellShape | undefined
 
     for (const cell of selectedCells) {
@@ -96,7 +96,7 @@ export default function CustomPatternEditor({
     }
 
     return { opacity, color, glow, shape }
-  }, [selectedCells, options.color])
+  }, [selectedCells, options.color, options.glow])
 
   const updatePath = useCallback((nextPath: CustomPathStep[]) => {
     onPathChange(nextPath, generateCustomFrames(nextPath, options.gridSize))
@@ -230,12 +230,12 @@ export default function CustomPatternEditor({
         ...cell,
         opacity: selectedProps.opacity !== 100 ? selectedProps.opacity : undefined,
         color: selectedProps.color !== options.color ? selectedProps.color : undefined,
-        glow: selectedProps.glow > 0 ? selectedProps.glow : undefined,
+        glow: selectedProps.glow !== options.glow ? selectedProps.glow : undefined,
         shape: selectedProps.shape,
       })),
       tracks: undefined,
     })))
-  }, [options.color, path, selectedProps, updatePath])
+  }, [options.color, options.glow, path, selectedProps, updatePath])
 
   const undoLast = useCallback(() => {
     const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step), tracks: undefined }))

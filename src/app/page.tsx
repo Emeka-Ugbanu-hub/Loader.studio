@@ -17,6 +17,7 @@ const DEFAULT_OPTIONS: LoaderOptions = {
   color: '#ffffff',
   trail: false,
   speed: 8,
+  glow: 0,
   shape: 'square',
 }
 

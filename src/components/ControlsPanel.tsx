@@ -53,6 +53,14 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
           max={24}
           onChange={(v) => onChange({ speed: v })}
         />
+        <ControlSlider
+          label="Glow"
+          value={options.glow}
+          min={0}
+          max={50}
+          step={2}
+          onChange={(v) => onChange({ glow: v })}
+        />
       </div>
 
       <div className="control-row">
@@ -113,6 +121,7 @@ function ControlSlider({
   value,
   min,
   max,
+  step = 1,
   onChange,
 }: {
   label: string
@@ -120,6 +129,7 @@ function ControlSlider({
   value: number
   min: number
   max: number
+  step?: number
   onChange: (v: number) => void
 }) {
   return (
@@ -132,6 +142,7 @@ function ControlSlider({
         type="range"
         min={min}
         max={max}
+        step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="range-input"

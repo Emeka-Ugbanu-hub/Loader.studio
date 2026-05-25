@@ -111,7 +111,7 @@ export default function LoaderCanvas({
           const key = k(r, c)
           const cellColor = cellColors.get(key) || color
           const cellShape = cellShapes.get(key) ?? globalShape
-          const glow = cellGlows.get(key) ?? 0
+          const glow = cellGlows.get(key) ?? options.glow
           ctx.globalAlpha = alpha
           ctx.fillStyle = cellColor
           if (glow > 0) {
