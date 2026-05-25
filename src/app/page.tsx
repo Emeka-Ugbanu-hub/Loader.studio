@@ -6,7 +6,7 @@ import ControlsPanel from '@/components/ControlsPanel'
 import PresetGrid from '@/components/PresetGrid'
 import CustomPatternEditor from '@/components/CustomPatternEditor'
 import BrandLogo from '@/components/BrandLogo'
-import { generateLoaderCode } from '@/lib/exporter'
+import { generateLoaderSVG } from '@/lib/svgExporter'
 import { applyTrailToFrames, generateCustomFrames, getPresetColor, patternGenerators } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 
@@ -141,13 +141,13 @@ export default function Home() {
     setHiddenCells(hidden)
   }, [])
 
-  const handleCopyCode = useCallback(() => {
-    const code = generateLoaderCode(displayOptions, trailedFrames, mode === 'custom' ? customPath : undefined)
-    navigator.clipboard.writeText(code).then(() => {
+  const handleCopySVG = useCallback(() => {
+    const svg = generateLoaderSVG(displayOptions, trailedFrames, mode === 'custom' ? customPath : undefined, hiddenCells)
+    navigator.clipboard.writeText(svg).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
-  }, [displayOptions, trailedFrames, mode, customPath])
+  }, [displayOptions, trailedFrames, mode, customPath, hiddenCells])
 
   return (
     <div className="studio-shell min-h-screen text-neutral-100">
@@ -203,8 +203,8 @@ export default function Home() {
             </div>
           </div>
 
-          <button onClick={handleCopyCode} className="primary-action">
-            {copied ? 'Code copied' : 'Copy embed code'}
+          <button onClick={handleCopySVG} className="primary-action">
+            {copied ? 'SVG copied' : 'Copy animated SVG'}
           </button>
 
           <ControlsPanel
