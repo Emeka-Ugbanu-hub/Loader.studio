@@ -104,9 +104,22 @@ export default function Home() {
     () => activeFrames.length > 0 ? activeFrames : [emptyFrame(options.gridSize)],
     [activeFrames, options.gridSize]
   )
+  const trailCellKeys = useMemo(() => {
+    if (mode !== 'custom' || !customPath.length) return true as const
+    const set = new Set<string>()
+    for (const step of customPath) {
+      const cells = [step.cells, ...(step.tracks?.map((t) => t.cells) ?? [])].flat()
+      for (const c of cells) {
+        const t = c.trail ?? step.trail
+        if (t === true) set.add(`${c.row},${c.col}`)
+      }
+    }
+    return set
+  }, [customPath, mode])
+
   const trailedFrames = useMemo(
-    () => applyTrailToFrames(safeFrames, options.trail),
-    [safeFrames, options.trail]
+    () => applyTrailToFrames(safeFrames, options.trail && mode === 'preset' ? true : trailCellKeys),
+    [safeFrames, options.trail, trailCellKeys, mode]
   )
   const displayOptions = useMemo(() => ({
     ...options,

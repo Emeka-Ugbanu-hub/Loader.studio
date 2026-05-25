@@ -22,6 +22,7 @@ export interface CustomPathPoint {
   opacity?: number
   color?: string
   glow?: number
+  trail?: boolean
   shape?: CellShape
 }
 
@@ -37,6 +38,7 @@ export interface CustomPathStep {
   opacity?: number
   color?: string
   glow?: number
+  trail?: boolean
   shape?: CellShape
   pattern?: MovementPattern
   buildAs?: 'group' | 'singles'

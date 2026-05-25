@@ -99,16 +99,18 @@ export default function CustomPatternEditor({
     let opacity = 100
     let color = options.color
     let glow = options.glow
+    let trail = false
     let shape: CellShape | undefined
 
     for (const cell of selectedCells) {
       opacity = cellAlpha(cell)
       if (cell.color) color = cell.color
       if (cell.glow != null) glow = cell.glow
+      if (cell.trail != null) trail = cell.trail
       if (cell.shape) shape = cell.shape
     }
 
-    return { opacity, color, glow, shape }
+    return { opacity, color, glow, trail, shape }
   }, [selectedCells, options.color, options.glow])
 
   const updatePath = useCallback((nextPath: CustomPathStep[]) => {
@@ -206,7 +208,7 @@ export default function CustomPatternEditor({
     return new Set<string>()
   }, [activePath, path, selectedKeys, styleScope])
 
-  const updateCellProp = useCallback((val: string | number, prop: 'opacity' | 'color' | 'glow' | 'shape') => {
+  const updateCellProp = useCallback((val: string | number | boolean, prop: 'opacity' | 'color' | 'glow' | 'trail' | 'shape') => {
     if (scopeKeys.size === 0) return
 
     updatePath(path.map((step) => ({
@@ -218,7 +220,7 @@ export default function CustomPatternEditor({
     })))
   }, [path, scopeKeys, updatePath])
 
-  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'shape') => {
+  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'trail' | 'shape') => {
     if (scopeKeys.size === 0) return
 
     updatePath(path.map((step) => ({
@@ -642,6 +644,20 @@ export default function CustomPatternEditor({
                     {scope === 'selected' ? 'Selected' : scope === 'path' ? 'Path' : 'All animated'}
                   </button>
                 ))}
+              </div>
+              <div className="inline-control" style={{ marginTop: 4 }}>
+                <span>Trail</span>
+                <button
+                  type="button"
+                  onClick={() => updateCellProp(!selectedProps.trail, 'trail')}
+                  className={`toggle-switch ${selectedProps.trail ? 'is-active' : ''}`}
+                  aria-pressed={selectedProps.trail}
+                >
+                  <span />
+                </button>
+                {selectedProps.trail && (
+                  <button onClick={() => removeCellProp('trail')} className="text-button">Reset</button>
+                )}
               </div>
               <label className="mini-slider">
                 <span>Opacity</span>

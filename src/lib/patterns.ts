@@ -229,8 +229,13 @@ function motionFrame(frames: number[][][], frameIndex: number): number[][] {
   return next
 }
 
-export function applyTrailToFrames(frames: number[][][], trail: boolean): number[][][] {
-  if (!trail || frames.length <= 1) return frames
+export function applyTrailToFrames(
+  frames: number[][][],
+  trail: boolean | Set<string>
+): number[][][] {
+  const trailSet = trail instanceof Set ? trail : null
+  if (!trailSet && !trail) return frames
+  if (frames.length <= 1) return frames
 
   const trailLength = Math.min(5, Math.max(2, Math.ceil(frames.length / 4)))
   const motionFrames = frames.map((_, frameIndex) => motionFrame(frames, frameIndex))
@@ -245,6 +250,7 @@ export function applyTrailToFrames(frames: number[][][], trail: boolean): number
 
       for (let r = 0; r < source.length; r++) {
         for (let c = 0; c < source[r].length; c++) {
+          if (trailSet && !trailSet.has(`${r},${c}`)) continue
           next[r][c] = Math.max(next[r][c], source[r][c] * opacity)
         }
       }
