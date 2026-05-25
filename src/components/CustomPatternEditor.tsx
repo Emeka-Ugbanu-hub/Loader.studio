@@ -475,49 +475,43 @@ export default function CustomPatternEditor({
                   onMouseEnter={() => setHoveredPathIndex(index)}
                   onMouseLeave={() => setHoveredPathIndex(null)}
                 >
-                  <strong onClick={() => {
-                    setActivePathIndex(index)
-                    setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
-                  }}>{labelForPath(index)}</strong>
-                  <span onClick={() => {
-                    setActivePathIndex(index)
-                    setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
-                  }}>{getStepCells(step).length} cells</span>
-                  {step.buildAs === 'group' && (
-                    <em onClick={handleUngroup} title="Click to ungroup">
-                      Group
-                      <span className="ungroup-hint">✕</span>
-                    </em>
-                  )}
-                  <div className="path-chip-controls">
+                  <div
+                    className="path-chip-main"
+                    onClick={() => {
+                      setActivePathIndex(index)
+                      setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
+                    }}
+                  >
+                    <strong>{labelForPath(index)}</strong>
+                    <span>{getStepCells(step).length} cells</span>
+                    {step.buildAs === 'group' && (
+                      <em onClick={(e) => { e.stopPropagation(); handleUngroup() }} title="Click to ungroup">
+                        Group ✕
+                      </em>
+                    )}
+                  </div>
+                  <div className="path-chip-actions">
                     <button
-                      className="reorder-btn"
                       onClick={() => movePathUp(index)}
                       disabled={index === 0}
-                      title="Move earlier"
-                    >▲</button>
+                    >Earlier</button>
                     <button
-                      className="reorder-btn"
                       onClick={() => movePathDown(index)}
                       disabled={index === path.length - 1}
-                      title="Move later"
-                    >▼</button>
+                    >Later</button>
                     <button
-                      className="reorder-btn reverse-btn"
                       onClick={() => reversePath(index)}
-                      title="Reverse cell order"
-                    >↻</button>
+                    >Reverse</button>
                   </div>
                   {index > 0 && (
                     <button
-                      className="timing-toggle"
+                      className="timing-row"
                       onClick={(e) => {
                         e.stopPropagation()
                         toggleStepTiming(index)
                       }}
-                      title="Toggle start timing"
                     >
-                      {step.timing === 'simultaneous' ? 'Start together' : 'Start after'}
+                      {step.timing === 'simultaneous' ? 'Starts with previous' : 'Starts after previous'}
                     </button>
                   )}
                 </div>
