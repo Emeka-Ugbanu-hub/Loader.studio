@@ -657,9 +657,15 @@ button:disabled {
   color: #f2f2f2;
 }
 
+.builder-cell.is-idle-path {
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04);
+  color: #8b8b94;
+}
+
 .builder-cell.is-active-path {
-  border-color: rgba(255,255,255,0.4);
-  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.1);
 }
 
 .builder-cell.is-selected {
@@ -1039,6 +1045,22 @@ button:disabled {
   font-size: 16px;
   font-weight: 500;
   line-height: 1.1;
+}
+
+.selection-basket {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.selection-chip {
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: #d4d4d8;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
 }
 
 .selection-tools {

@@ -84,6 +84,15 @@ export default function CustomPatternEditor({
     })
   ), [selectedKeys, cellToPlacement, path])
 
+  const selectionBasket = useMemo(() => {
+    return selectedKeys.map((key) => {
+      const placement = cellToPlacement.get(key)
+      return placement
+        ? `${labelForPath(placement.pathIndex)}${placement.cellIndex + 1}`
+        : null
+    }).filter(Boolean) as string[]
+  }, [selectedKeys, cellToPlacement])
+
   const selectedProps = useMemo(() => {
     let opacity = 100
     let color = options.color
@@ -385,6 +394,7 @@ export default function CustomPatternEditor({
                 const isSelected = selectedSet.has(key)
                 const isActivePath = placement?.pathIndex === safeActivePathIndex
                 const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
+                const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
 
                 return (
                   <button
@@ -394,7 +404,7 @@ export default function CustomPatternEditor({
                       event.preventDefault()
                       toggleHiddenCell(row, col)
                     }}
-                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
                     style={{ width: editorCellSize, height: editorCellSize }}
                     aria-label={`Cell row ${row + 1}, column ${col + 1}`}
                   >
@@ -493,7 +503,11 @@ export default function CustomPatternEditor({
                 className="path-action-primary"
                 onClick={() => {
                   setSelectedKeys([])
-                  setActivePathIndex(path.length)
+                  const cleanPath = path.filter((step) => getStepCells(step).length > 0)
+                  setActivePathIndex(cleanPath.length)
+                  if (cleanPath.length !== path.length) {
+                    updatePath(cleanPath)
+                  }
                 }}
               >
                 New path
@@ -531,8 +545,21 @@ export default function CustomPatternEditor({
               </p>
             ) : (
               <div className="selection-tools">
+                {selectionBasket.length > 0 && (
+                  <div className="selection-basket">
+                    {selectionBasket.map((label) => (
+                      <span key={label} className="selection-chip">{label}</span>
+                    ))}
+                  </div>
+                )}
                 {showCreateGroup && (
                   <button onClick={handleCreateGroup} className="secondary-action">Create group</button>
+                )}
+                {selectedCount > 0 && (
+                  <>
+                    <strong>{selectedCount} selected</strong>
+                    <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
+                  </>
                 )}
           {(selectedCount > 0 || path.length > 0) && (
                   <>
