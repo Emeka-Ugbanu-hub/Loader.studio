@@ -122,35 +122,6 @@ export default function CustomPatternEditor({
     setSelectedKeys((keys) => keys.filter((selected) => selected !== key))
   }, [hiddenCells, hiddenSet, onHiddenCellsChange])
 
-  const appendCellToPath = useCallback((row: number, col: number) => {
-    const key = k(row, col)
-    if (hiddenSet.has(key) || cellToPlacement.has(key)) return
-
-    const nextCell: CustomPathPoint = { row, col }
-    const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step).map((c) => ({ ...c })) }))
-    const index = safeActivePathIndex
-
-    if (index >= nextPath.length) {
-      nextPath.push({
-        cells: [nextCell],
-        buildAs: 'singles',
-        play: 'one-by-one',
-        timing: nextPath.length === 0 ? 'sequence' : animationMode,
-      })
-      setActivePathIndex(nextPath.length - 1)
-    } else {
-      nextPath[index] = {
-        ...nextPath[index],
-        cells: [...getStepCells(nextPath[index]), nextCell],
-        tracks: undefined,
-        buildAs: nextPath[index].buildAs ?? 'singles',
-        play: nextPath[index].play ?? 'one-by-one',
-      }
-    }
-
-    updatePath(nextPath)
-  }, [animationMode, cellToPlacement, hiddenSet, path, safeActivePathIndex, updatePath])
-
   const handleCellClick = useCallback((row: number, col: number) => {
     const key = k(row, col)
     if (hiddenSet.has(key)) return
@@ -158,16 +129,14 @@ export default function CustomPatternEditor({
     const placement = cellToPlacement.get(key)
     if (placement) {
       setActivePathIndex(placement.pathIndex)
-      setSelectedKeys((keys) =>
-        keys.includes(key)
-          ? keys.filter((k) => k !== key)
-          : [...keys, key]
-      )
-      return
     }
 
-    appendCellToPath(row, col)
-  }, [appendCellToPath, cellToPlacement, hiddenSet])
+    setSelectedKeys((keys) =>
+      keys.includes(key)
+        ? keys.filter((k) => k !== key)
+        : [...keys, key]
+    )
+  }, [cellToPlacement, hiddenSet])
 
   const withoutSelectedCells = useCallback(() => (
     path.flatMap((step) => {
@@ -263,9 +232,10 @@ export default function CustomPatternEditor({
   const showCreateGroup = selectedCount > 1
   const showTiming = path.length > 1
 
-  const handleCreateGroup = useCallback(() => {
-    if (selectedCount < 2) return
+  const handleAddToPath = useCallback(() => {
+    if (selectedKeys.length === 0) return
 
+    const isGroup = selectedCells.length >= 2
     const keySet = new Set(selectedKeys)
     const selectedIndexes = new Set(
       selectedKeys
@@ -273,7 +243,7 @@ export default function CustomPatternEditor({
         .filter((idx): idx is number => idx !== undefined)
     )
 
-    if (selectedIndexes.size === 1) {
+    if (selectedIndexes.size === 1 && isGroup) {
       const [index] = Array.from(selectedIndexes)
       const allCells = getStepCells(path[index])
       const selectedCoversPath = allCells.length === selectedCells.length
@@ -299,16 +269,16 @@ export default function CustomPatternEditor({
 
     const step: CustomPathStep = {
       cells: selectedCells,
-      buildAs: 'group',
+      buildAs: isGroup ? 'group' : 'singles',
       play: 'one-by-one',
-      pattern: 'wave-lr',
+      pattern: isGroup ? 'wave-lr' : undefined,
       timing: basePath.length === 0 ? 'sequence' : animationMode,
     }
 
     updatePath([...basePath, step])
     setActivePathIndex(basePath.length)
     setSelectedKeys([])
-  }, [animationMode, cellToPlacement, path, selectedCells, selectedCount, selectedKeys, updatePath])
+  }, [animationMode, cellToPlacement, path, selectedCells, selectedKeys, updatePath])
 
   return (
     <div className="custom-workspace">
@@ -441,19 +411,17 @@ export default function CustomPatternEditor({
               )}
             </div>
 
-            {selectedCount === 0 && !showCreateGroup ? (
-              <p className="muted-copy">Click empty cells to build. Click numbered cells to edit.</p>
+            {selectedCount === 0 ? (
+              <p className="muted-copy">Click cells to select them, then use buttons to add or group.</p>
             ) : (
               <div className="selection-tools">
-                {showCreateGroup && (
-                  <button onClick={handleCreateGroup} className="secondary-action">Create group</button>
+                <strong>{selectedCount} selected</strong>
+                {showCreateGroup ? (
+                  <button onClick={handleAddToPath} className="secondary-action">Create group</button>
+                ) : (
+                  <button onClick={handleAddToPath} className="secondary-action">Add to path</button>
                 )}
-                {selectedCount > 0 && (
-                  <>
-                    <strong>{selectedCount} selected</strong>
-                    <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
-                  </>
-                )}
+                <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
               </div>
             )}
           </section>
