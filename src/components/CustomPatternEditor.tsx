@@ -655,9 +655,6 @@ export default function CustomPatternEditor({
                 >
                   <span />
                 </button>
-                {selectedProps.trail && (
-                  <button onClick={() => removeCellProp('trail')} className="text-button">Reset</button>
-                )}
               </div>
               <label className="mini-slider">
                 <span>Opacity</span>
