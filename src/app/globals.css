@@ -802,6 +802,7 @@ button:disabled {
   color: #030303;
   font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .path-chip span {
@@ -809,6 +810,7 @@ button:disabled {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .path-chip em {
@@ -818,6 +820,25 @@ button:disabled {
   font-size: 10px;
   font-style: normal;
   padding: 4px 7px;
+}
+
+.timing-toggle {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  color: #88888f;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  white-space: nowrap;
+}
+
+.timing-toggle:hover {
+  border-color: rgba(255,255,255,0.28);
+  color: #fff;
+  background: rgba(255,255,255,0.1);
 }
 
 .path-chip.is-new strong {

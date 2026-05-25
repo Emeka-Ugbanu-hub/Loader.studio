@@ -13,8 +13,6 @@ interface Props {
   onHiddenCellsChange: (hidden: string[]) => void
 }
 
-type AnimationMode = 'sequence' | 'simultaneous'
-
 function k(r: number, c: number) {
   return `${r},${c}`
 }
@@ -57,10 +55,6 @@ export default function CustomPatternEditor({
   const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
   const safeActivePathIndex = Math.min(activePathIndex, path.length)
   const activePath = path[safeActivePathIndex]
-
-  const animationMode: AnimationMode = path.slice(1).some((step) => step.timing === 'simultaneous')
-    ? 'simultaneous'
-    : 'sequence'
 
   const cellToPlacement = useMemo(() => {
     const placements = new Map<string, { pathIndex: number; cellIndex: number; isGroup: boolean }>()
@@ -106,13 +100,6 @@ export default function CustomPatternEditor({
     onPathChange(nextPath, generateCustomFrames(nextPath, options.gridSize))
   }, [onPathChange, options.gridSize])
 
-  const setAnimationMode = useCallback((mode: AnimationMode) => {
-    updatePath(path.map((step, index) => ({
-      ...step,
-      timing: index === 0 ? 'sequence' : mode,
-    })))
-  }, [path, updatePath])
-
   const toggleHiddenCell = useCallback((r: number, c: number) => {
     const key = k(r, c)
     onHiddenCellsChange(hiddenSet.has(key)
@@ -135,7 +122,7 @@ export default function CustomPatternEditor({
         cells: [nextCell],
         buildAs: 'singles',
         play: 'one-by-one',
-        timing: nextPath.length === 0 ? 'sequence' : animationMode,
+        timing: 'sequence',
       })
       setActivePathIndex(nextPath.length - 1)
     } else {
@@ -149,7 +136,7 @@ export default function CustomPatternEditor({
     }
 
     updatePath(nextPath)
-  }, [animationMode, cellToPlacement, hiddenSet, path, safeActivePathIndex, updatePath])
+  }, [cellToPlacement, hiddenSet, path, safeActivePathIndex, updatePath])
 
   const handleCellClick = useCallback((row: number, col: number) => {
     const key = k(row, col)
@@ -261,7 +248,6 @@ export default function CustomPatternEditor({
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
   const showCreateGroup = activePath && !activeIsGroup && getStepCells(activePath).length > 1
-  const showTiming = path.length > 1
 
   const handleCreateGroup = useCallback(() => {
     if (!activePath) return
@@ -273,6 +259,14 @@ export default function CustomPatternEditor({
     setSelectedKeys([])
     setActivePathIndex(path.length)
   }, [activePath, path, safeActivePathIndex, updatePath])
+
+  const toggleStepTiming = useCallback((index: number) => {
+    updatePath(path.map((step, stepIndex) => (
+      stepIndex === index
+        ? { ...step, timing: step.timing === 'simultaneous' ? 'sequence' : 'simultaneous' }
+        : step
+    )))
+  }, [path, updatePath])
 
   return (
     <div className="custom-workspace">
@@ -335,38 +329,36 @@ export default function CustomPatternEditor({
           <section>
             <div className="inspector-row">
               <p className="inspector-label">Paths</p>
-              {showTiming && (
-                <div className="mini-toggle" aria-label="Animation mode">
-                  <button
-                    onClick={() => setAnimationMode('sequence')}
-                    className={animationMode === 'sequence' ? 'is-active' : ''}
-                  >
-                    Sequence
-                  </button>
-                  <button
-                    onClick={() => setAnimationMode('simultaneous')}
-                    className={animationMode === 'simultaneous' ? 'is-active' : ''}
-                  >
-                    Simultaneous
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className="path-strip">
               {path.map((step, index) => (
-                <button
+                <div
                   key={`${index}-${getStepCells(step).length}`}
-                  onClick={() => {
-                    setActivePathIndex(index)
-                    setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
-                  }}
                   className={`path-chip ${index === safeActivePathIndex ? 'is-active' : ''}`}
                 >
-                  <strong>{labelForPath(index)}</strong>
-                  <span>{getStepCells(step).length} cells</span>
+                  <strong onClick={() => {
+                    setActivePathIndex(index)
+                    setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
+                  }}>{labelForPath(index)}</strong>
+                  <span onClick={() => {
+                    setActivePathIndex(index)
+                    setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
+                  }}>{getStepCells(step).length} cells</span>
                   {step.buildAs === 'group' && <em>Group</em>}
-                </button>
+                  {index > 0 && (
+                    <button
+                      className="timing-toggle"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleStepTiming(index)
+                      }}
+                      title={step.timing === 'simultaneous' ? 'Start: Together — click to change' : 'Start: After previous — click to change'}
+                    >
+                      {step.timing === 'simultaneous' ? 'Together' : 'After'}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
 
