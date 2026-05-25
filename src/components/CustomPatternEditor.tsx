@@ -55,6 +55,7 @@ export default function CustomPatternEditor({
   const [styleScope, setStyleScope] = useState<'selected' | 'path' | 'all'>('selected')
   const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null)
   const [multiSelectMode, setMultiSelectMode] = useState(false)
+  const [reversedIndex, setReversedIndex] = useState<number | null>(null)
 
   const hiddenSet = useMemo(() => new Set(hiddenCells), [hiddenCells])
   const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
@@ -502,8 +503,12 @@ export default function CustomPatternEditor({
                       disabled={index === path.length - 1}
                     >Later</button>
                     <button
-                      className="reverse-action"
-                      onClick={() => reversePath(index)}
+                      className={`reverse-action ${reversedIndex === index ? 'is-active' : ''}`}
+                      onClick={() => {
+                        reversePath(index)
+                        setReversedIndex(index)
+                        setTimeout(() => setReversedIndex(null), 800)
+                      }}
                     >Reverse</button>
                   </div>
                   {index > 0 && (

@@ -916,6 +916,12 @@ button:disabled {
   background: rgba(255,255,255,0.08);
 }
 
+.path-chip-actions .reverse-action.is-active {
+  border-color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+}
+
 .timing-row {
   border: 1px solid rgba(255,255,255,0.09);
   border-radius: 10px;
