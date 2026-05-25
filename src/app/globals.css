@@ -824,6 +824,59 @@ button:disabled {
   color: #f4f4f5;
 }
 
+.path-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.path-action-primary {
+  flex: 1 1 auto;
+  min-height: 38px;
+  min-width: 90px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 999px;
+  background: #fff;
+  color: #050505;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 14px;
+  transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease;
+  cursor: pointer;
+}
+
+.path-action-primary:hover {
+  transform: translateY(-1px);
+}
+
+.path-action-primary:active {
+  transform: translateY(0);
+}
+
+.path-action-secondary {
+  min-height: 38px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.035);
+  color: #aaaab1;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 14px;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  cursor: pointer;
+}
+
+.path-action-secondary:hover {
+  border-color: rgba(255,255,255,0.28);
+  color: #fff;
+}
+
+.path-action-secondary:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .mini-toggle {
   display: flex;
   gap: 3px;

@@ -275,18 +275,6 @@ export default function CustomPatternEditor({
           <p className="eyebrow">Custom builder</p>
           <h3 className="panel-title small">Build ordered paths on the grid</h3>
         </div>
-        <div className="builder-actions">
-          <button
-            onClick={() => {
-              setSelectedKeys([])
-              setActivePathIndex(path.length)
-            }}
-          >
-            New path
-          </button>
-          <button onClick={undoLast} disabled={path.length === 0}>Undo</button>
-          <button onClick={clearAll} disabled={path.length === 0 && hiddenCells.length === 0}>Clear</button>
-        </div>
       </div>
 
       <div className="builder-layout">
@@ -374,6 +362,32 @@ export default function CustomPatternEditor({
                   {step.buildAs === 'group' && <em>Group</em>}
                 </button>
               ))}
+            </div>
+
+            <div className="path-actions">
+              <button
+                className="path-action-primary"
+                onClick={() => {
+                  setSelectedKeys([])
+                  setActivePathIndex(path.length)
+                }}
+              >
+                New path
+              </button>
+              <button
+                className="path-action-secondary"
+                onClick={undoLast}
+                disabled={path.length === 0}
+              >
+                Undo
+              </button>
+              <button
+                className="path-action-secondary"
+                onClick={clearAll}
+                disabled={path.length === 0 && hiddenCells.length === 0}
+              >
+                Clear
+              </button>
             </div>
           </section>
 
