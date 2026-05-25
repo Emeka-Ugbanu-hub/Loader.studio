@@ -163,9 +163,19 @@ export default function Home() {
           <div className="flex min-w-0 items-center gap-4">
             <BrandLogo />
           </div>
-          <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-400 md:flex">
-            <span className={`h-1.5 w-1.5 rounded-full ${draftStatus === 'saved' || draftStatus === 'restored' ? 'bg-emerald-400' : 'bg-white/40'}`} />
-            {draftStatus === 'restored' ? 'Restored draft' : draftStatus === 'saved' ? 'Saved' : 'Live preview'}
+          <div className="flex items-center gap-3">
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-400 md:flex">
+              <span className={`h-1.5 w-1.5 rounded-full ${draftStatus === 'saved' || draftStatus === 'restored' ? 'bg-emerald-400' : 'bg-white/40'}`} />
+              {draftStatus === 'restored' ? 'Restored draft' : draftStatus === 'saved' ? 'Saved' : 'Live preview'}
+            </div>
+            <a
+              href="https://github.com/Emeka-Ugbanu-hub/Loader.studio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-400 transition hover:border-white/25 hover:text-white"
+            >
+              GitHub
+            </a>
           </div>
         </div>
       </header>
