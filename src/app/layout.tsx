@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,9 +12,52 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#030303",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "loader.studio",
-  description: "Create polished animated pixel/grid loaders with ease",
+  title: "Loader.studio — Animated SVG Loader Generator",
+  description:
+    "Design pixel-grid animated loaders visually. Choose from spiral, wave, pulse presets or build custom animation paths. Export self-contained animated SVG — no JavaScript, no dependencies. Free, open source, and works entirely in the browser.",
+  keywords: [
+    "animated loader",
+    "svg loader",
+    "pixel loader",
+    "loading animation",
+    "spinner generator",
+    "custom loader",
+    "loader maker",
+    "open source loader",
+    "svg animation",
+    "grid loader",
+  ],
+  authors: [{ name: "Emeka Ugbanu" }],
+  creator: "Emeka Ugbanu",
+  publisher: "Loader.studio",
+  robots: { index: true, follow: true },
+  metadataBase: new URL("https://emeka-ugbanu-hub.github.io"),
+  alternates: {
+    canonical: "/Loader.studio",
+  },
+  openGraph: {
+    title: "Loader.studio — Animated SVG Loader Generator",
+    description:
+      "Design pixel-grid animated loaders visually. Choose presets or build custom paths. Export animated SVG — no JavaScript.",
+    url: "https://emeka-ugbanu-hub.github.io/Loader.studio",
+    siteName: "Loader.studio",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Loader.studio — Animated SVG Loader Generator",
+    description:
+      "Design pixel-grid animated loaders visually. Export self-contained animated SVG.",
+    creator: "@emekaugbanu",
+  },
   icons: {
     icon: "/loader-studio-icon.svg",
     shortcut: "/loader-studio-icon.svg",
