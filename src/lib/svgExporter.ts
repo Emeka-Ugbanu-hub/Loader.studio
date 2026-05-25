@@ -1,5 +1,4 @@
 import type { LoaderOptions, CustomPathStep, CellShape } from './types'
-import { getGridCellPosition, getGridLayoutBounds } from './layouts'
 
 function k(r: number, c: number) {
   return `${r},${c}`
@@ -11,9 +10,8 @@ export function generateLoaderSVG(
   customPath?: CustomPathStep[],
   hiddenCells?: string[]
 ): string {
-  const { gridSize, cellSize, gap, color: defaultColor, speed, shape: defaultShape, glow: defaultGlow, gridLayout } = options
-  const bounds = getGridLayoutBounds(cellSize, gap, gridSize, gridLayout)
-  const totalSize = bounds.width
+  const { gridSize, cellSize, gap, color: defaultColor, speed, shape: defaultShape, glow: defaultGlow } = options
+  const totalSize = gridSize * (cellSize + gap) - gap
   const dur = frames.length / speed
   const hiddenSet = new Set(hiddenCells ?? [])
 
@@ -68,10 +66,8 @@ export function generateLoaderSVG(
 
   let shapes = ''
   for (const cell of animatedCells) {
-    const pos = getGridCellPosition(cell.r, cell.c, cellSize, gap, gridSize, gridLayout)
-    if (!pos.visible) continue
-    const x = pos.x
-    const y = pos.y
+    const x = cell.c * (cellSize + gap)
+    const y = cell.r * (cellSize + gap)
     const glow = cellGlows.get(cell.key) ?? defaultGlow
     const fillColor = cellColors.get(cell.key) ?? defaultColor
     const shape = cellShapes.get(cell.key) ?? defaultShape

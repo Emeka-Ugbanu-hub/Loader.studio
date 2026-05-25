@@ -29,7 +29,6 @@ const DEFAULT_OPTIONS: LoaderOptions = {
   speed: 8,
   glow: 0,
   shape: 'square',
-  gridLayout: 'square',
 }
 
 function emptyFrame(size: number) {

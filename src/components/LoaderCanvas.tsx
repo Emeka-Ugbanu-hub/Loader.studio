@@ -3,7 +3,6 @@
 import { useRef, useEffect, useCallback, useMemo } from 'react'
 import type { LoaderOptions, CustomPathStep, CellShape } from '@/lib/types'
 import { drawCellShape } from '@/lib/drawCell'
-import { getGridCellPosition, getGridLayoutBounds } from '@/lib/layouts'
 
 interface Props {
   options: LoaderOptions
@@ -77,13 +76,14 @@ export default function LoaderCanvas({
   }, [customPath])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, frame: number[][]) => {
-    const { gridSize, cellSize, gap, color, shape: globalShape, gridLayout } = options
-    const layoutBounds = getGridLayoutBounds(cellSize, gap, gridSize, gridLayout)
-    const scale = Math.max(1, Math.min(4, (Math.min(w, h) * 0.72) / Math.max(layoutBounds.width, layoutBounds.height)))
-    const drawCellSize = cellSize * scale
-    const totalW = gridSize * (drawCellSize + gap * scale) - gap * scale
-    const ox = (w - totalW) / 2
-    const oy = (h - totalW) / 2
+    const { gridSize, cellSize, gap, color, shape: globalShape } = options
+    const baseTotalSize = gridSize * (cellSize + gap) - gap
+    const previewScale = Math.max(1, Math.min(4, (Math.min(w, h) * 0.72) / baseTotalSize))
+    const drawCellSize = cellSize * previewScale
+    const drawGap = gap * previewScale
+    const totalSize = gridSize * (drawCellSize + drawGap) - drawGap
+    const ox = (w - totalSize) / 2
+    const oy = (h - totalSize) / 2
     const hiddenSet = new Set(hiddenCells)
 
     ctx.clearRect(0, 0, w, h)
@@ -91,12 +91,10 @@ export default function LoaderCanvas({
     if (showBgGrid) {
       for (let r = 0; r < gridSize; r++) {
         for (let c = 0; c < gridSize; c++) {
-          if (hiddenSet.has(k(r, c))) continue
-          const pos = getGridCellPosition(r, c, cellSize, gap, gridSize, gridLayout)
-          if (!pos.visible) continue
+          if (hiddenSet.has(`${r},${c}`)) continue
           const bgShape = cellShapes.get(k(r, c)) ?? globalShape
-          const x = ox + pos.x * scale
-          const y = oy + pos.y * scale
+          const x = ox + c * (drawCellSize + drawGap)
+          const y = oy + r * (drawCellSize + drawGap)
           ctx.fillStyle = 'rgba(255,255,255,0.08)'
           drawCellShape(ctx, x, y, drawCellSize, bgShape)
         }
@@ -107,9 +105,7 @@ export default function LoaderCanvas({
 
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        if (hiddenSet.has(k(r, c))) continue
-        const pos = getGridCellPosition(r, c, cellSize, gap, gridSize, gridLayout)
-        if (!pos.visible) continue
+        if (hiddenSet.has(`${r},${c}`)) continue
         const alpha = frame[r]?.[c]
         if (alpha != null && alpha > 0) {
           const key = k(r, c)
@@ -122,8 +118,8 @@ export default function LoaderCanvas({
             ctx.shadowBlur = glow * 2
             ctx.shadowColor = cellColor
           }
-          const x = ox + pos.x * scale
-          const y = oy + pos.y * scale
+          const x = ox + c * (drawCellSize + drawGap)
+          const y = oy + r * (drawCellSize + drawGap)
           drawCellShape(ctx, x, y, drawCellSize, cellShape)
           ctx.shadowBlur = 0
         }

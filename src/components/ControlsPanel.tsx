@@ -1,6 +1,6 @@
 'use client'
 
-import type { CellShape, GridLayout, LoaderOptions } from '@/lib/types'
+import type { CellShape, LoaderOptions } from '@/lib/types'
 
 interface Props {
   options: LoaderOptions
@@ -9,7 +9,6 @@ interface Props {
 }
 
 const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
-const LAYOUTS: GridLayout[] = ['square', 'honeycomb', 'circle', 'triangle', 'diamond', 'hex']
 
 export default function ControlsPanel({ options, onChange, colorLocked = false }: Props) {
   return (
@@ -97,26 +96,7 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
       </div>
 
       <div>
-        <div className="control-label mb-2">Layout</div>
-        <p className="control-note mb-2">Grid structure</p>
-        <div className="shape-grid">
-          {LAYOUTS.map((layout) => (
-            <button
-              key={layout}
-              onClick={() => onChange({ gridLayout: layout })}
-              className={`shape-button ${options.gridLayout === layout ? 'is-active' : ''}`}
-              title={layout}
-              aria-label={`Use ${layout} layout`}
-            >
-              {layout === 'square' ? '◻' : layout === 'honeycomb' ? '⬡' : layout === 'circle' ? '◯' : layout === 'triangle' ? '△' : layout === 'diamond' ? '◇' : '⬢'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="control-label mb-2">Tile shape</div>
-        <p className="control-note mb-2">Each cell shape</p>
+        <div className="control-label mb-2">Shape</div>
         <div className="shape-grid">
           {SHAPES.map((shape) => (
             <button

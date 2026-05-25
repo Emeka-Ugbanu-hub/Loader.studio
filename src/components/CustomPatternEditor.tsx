@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { CellShape, CustomPathPoint, CustomPathStep, LoaderOptions, MovementPattern } from '@/lib/types'
 import { generateCustomFrames } from '@/lib/patterns'
-import { getGridCellPosition } from '@/lib/layouts'
 
 interface Props {
   options: LoaderOptions
@@ -398,8 +397,6 @@ export default function CustomPatternEditor({
                 const isActivePath = placement?.pathIndex === safeActivePathIndex
                 const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
                 const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
-                const layoutPos = getGridCellPosition(row, col, 1, 1, options.gridSize, options.gridLayout)
-                const isOutsideLayout = !layoutPos.visible
 
                 return (
                   <button
@@ -409,12 +406,8 @@ export default function CustomPatternEditor({
                       event.preventDefault()
                       toggleHiddenCell(row, col)
                     }}
-                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${isOutsideLayout ? 'is-outside-layout' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
-                    style={{
-                      width: editorCellSize,
-                      height: editorCellSize,
-                      ...(options.gridLayout === 'honeycomb' && row % 2 === 1 ? { transform: `translateX(${editorCellSize / 2 + 3}px)` } : {}),
-                    }}
+                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                    style={{ width: editorCellSize, height: editorCellSize }}
                     aria-label={`Cell row ${row + 1}, column ${col + 1}`}
                   >
                     {hidden ? (
