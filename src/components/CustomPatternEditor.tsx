@@ -470,66 +470,68 @@ export default function CustomPatternEditor({
         </div>
 
         <div className="inspector-panel">
-          <section>
-            <div className="inspector-row">
+          <section className="paths-section">
+            <div className="inspector-row paths-section-header">
               <p className="inspector-label">Paths</p>
             </div>
 
-            <div className="path-strip">
-              {path.map((step, index) => (
-                <div
-                  key={`${index}-${getStepCells(step).length}`}
-                  className={`path-chip ${index === safeActivePathIndex ? 'is-active' : ''}`}
-                  onMouseEnter={() => setHoveredPathIndex(index)}
-                  onMouseLeave={() => setHoveredPathIndex(null)}
-                >
+            <div className="paths-scroll">
+              <div className="path-strip">
+                {path.map((step, index) => (
                   <div
-                    className="path-chip-main"
-                    onClick={() => {
-                      setActivePathIndex(index)
-                      setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
-                    }}
+                    key={`${index}-${getStepCells(step).length}`}
+                    className={`path-chip ${index === safeActivePathIndex ? 'is-active' : ''}`}
+                    onMouseEnter={() => setHoveredPathIndex(index)}
+                    onMouseLeave={() => setHoveredPathIndex(null)}
                   >
-                    <strong>{labelForPath(index)}</strong>
-                    <span>{getStepCells(step).length} cells</span>
-                    {step.buildAs === 'group' && (
-                      <em onClick={(e) => { e.stopPropagation(); handleUngroup() }} title="Click to ungroup">
-                        Group ✕
-                      </em>
-                    )}
-                  </div>
-                  <div className="path-chip-actions">
-                    <button
-                      onClick={() => movePathUp(index)}
-                      disabled={index === 0}
-                    >Earlier</button>
-                    <button
-                      onClick={() => movePathDown(index)}
-                      disabled={index === path.length - 1}
-                    >Later</button>
-                    <button
-                      className={`reverse-action ${reversedIndex === index ? 'is-active' : ''}`}
-                      onClick={() => handleReverse(index)}
-                    >Reverse</button>
-                  </div>
-                  {index > 0 && (
-                    <button
-                      className="timing-row"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleStepTiming(index)
+                    <div
+                      className="path-chip-main"
+                      onClick={() => {
+                        setActivePathIndex(index)
+                        setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
                       }}
                     >
-                      {step.timing === 'simultaneous' ? 'Starts with previous' : 'Starts after previous'}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+                      <strong>{labelForPath(index)}</strong>
+                      <span>{getStepCells(step).length} cells</span>
+                      {step.buildAs === 'group' && (
+                        <em onClick={(e) => { e.stopPropagation(); handleUngroup() }} title="Click to ungroup">
+                          Group ✕
+                        </em>
+                      )}
+                    </div>
+                    <div className="path-chip-actions">
+                      <button
+                        onClick={() => movePathUp(index)}
+                        disabled={index === 0}
+                      >Earlier</button>
+                      <button
+                        onClick={() => movePathDown(index)}
+                        disabled={index === path.length - 1}
+                      >Later</button>
+                      <button
+                        className={`reverse-action ${reversedIndex === index ? 'is-active' : ''}`}
+                        onClick={() => handleReverse(index)}
+                      >Reverse</button>
+                    </div>
+                    {index > 0 && (
+                      <button
+                        className="timing-row"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleStepTiming(index)
+                        }}
+                      >
+                        {step.timing === 'simultaneous' ? 'Starts with previous' : 'Starts after previous'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
-            {timingSummary && (
-              <p className="timing-summary">{timingSummary}</p>
-            )}
+              {timingSummary && (
+                <p className="timing-summary">{timingSummary}</p>
+              )}
+            </div>
 
             <div className="path-actions">
               {activePath && getStepCells(activePath).length > 0 && (

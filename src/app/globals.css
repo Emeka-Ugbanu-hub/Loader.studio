@@ -806,6 +806,33 @@ button:disabled {
   gap: 8px;
 }
 
+.paths-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.paths-section-header {
+  flex-shrink: 0;
+}
+
+.paths-scroll {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: min(380px, 42vh);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.paths-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.paths-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+}
+
 .path-chip {
   display: grid;
   gap: 10px;
