@@ -6,6 +6,7 @@ export function generateLoaderCode(options: LoaderOptions, frames: number[][][],
   const framesJson = JSON.stringify(frames)
   const cellColorsJson = customPath ? buildCellColors(customPath) : 'null'
   const cellShapesJson = customPath ? buildCellShapes(customPath) : 'null'
+  const cellGlowsJson = customPath ? buildCellGlows(customPath) : 'null'
 
   return `<canvas id="loader" width="${totalSize}" height="${totalSize}"></canvas>
 <script>
@@ -14,6 +15,7 @@ const ctx = canvas.getContext('2d');
 const frames = ${framesJson};
 const cellColors = ${cellColorsJson};
 const cellShapes = ${cellShapesJson};
+const cellGlows = ${cellGlowsJson};
 const defaultColor = '${color}';
 const defaultShape = '${shape}';
 let frame = 0;
@@ -72,11 +74,14 @@ function draw() {
         const key = cellKey(r, c);
         const fillColor = (cellColors && cellColors[key]) || defaultColor;
         const cellShape = (cellShapes && cellShapes[key]) || defaultShape;
+        const g = (cellGlows && cellGlows[key]) || 0;
         ctx.globalAlpha = alpha;
         ctx.fillStyle = fillColor;
+        if (g > 0) { ctx.shadowBlur = g * 2; ctx.shadowColor = fillColor; }
         const x = c * (cellSize + gap);
         const y = r * (cellSize + gap);
         drawCell(ctx, x, y, cellSize, cellShape);
+        ctx.shadowBlur = 0;
       }
     }
   }
@@ -108,4 +113,16 @@ function buildCellShapes(path: CustomPathStep[]): Record<string, string> {
       if (c.shape) shapes[`${c.row},${c.col}`] = c.shape
   }
   return shapes
+}
+
+function buildCellGlows(path: CustomPathStep[]): Record<string, number> {
+  const glows: Record<string, number> = {}
+  for (const step of path) {
+    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+    for (const c of cells) {
+      const g = c.glow ?? step.glow
+      if (g != null && g > 0) glows[`${c.row},${c.col}`] = g
+    }
+  }
+  return glows
 }

@@ -37,6 +37,20 @@ export default function LoaderCanvas({
   const accumulatedRef = useRef(0)
   const rafRef = useRef<number>(0)
 
+  const cellGlows = useMemo(() => {
+    const m = new Map<string, number>()
+    if (customPath) {
+      for (const step of customPath) {
+        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+        for (const c of cells) {
+          const g = c.glow ?? step.glow
+          if (g != null && g > 0) m.set(k(c.row, c.col), g)
+        }
+      }
+    }
+    return m
+  }, [customPath])
+
   const cellColors = useMemo(() => {
     const m = new Map<string, string>()
     if (customPath) {
@@ -97,16 +111,22 @@ export default function LoaderCanvas({
           const key = k(r, c)
           const cellColor = cellColors.get(key) || color
           const cellShape = cellShapes.get(key) ?? globalShape
+          const glow = cellGlows.get(key) ?? 0
           ctx.globalAlpha = alpha
           ctx.fillStyle = cellColor
+          if (glow > 0) {
+            ctx.shadowBlur = glow * 2
+            ctx.shadowColor = cellColor
+          }
           const x = ox + c * (drawCellSize + drawGap)
           const y = oy + r * (drawCellSize + drawGap)
           drawCellShape(ctx, x, y, drawCellSize, cellShape)
+          ctx.shadowBlur = 0
         }
       }
     }
     ctx.restore()
-  }, [options, showBgGrid, hiddenCells, cellColors, cellShapes])
+  }, [options, showBgGrid, hiddenCells, cellColors, cellGlows, cellShapes])
 
   useEffect(() => {
     const canvas = canvasRef.current

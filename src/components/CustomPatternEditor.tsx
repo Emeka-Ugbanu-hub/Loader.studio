@@ -85,15 +85,17 @@ export default function CustomPatternEditor({
   const selectedProps = useMemo(() => {
     let opacity = 100
     let color = options.color
+    let glow = 0
     let shape: CellShape | undefined
 
     for (const cell of selectedCells) {
       opacity = cellAlpha(cell)
       if (cell.color) color = cell.color
+      if (cell.glow != null) glow = cell.glow
       if (cell.shape) shape = cell.shape
     }
 
-    return { opacity, color, shape }
+    return { opacity, color, glow, shape }
   }, [selectedCells, options.color])
 
   const updatePath = useCallback((nextPath: CustomPathStep[]) => {
@@ -176,7 +178,7 @@ export default function CustomPatternEditor({
     setActivePathIndex((index) => Math.min(index, nextPath.length))
   }, [selectedKeys, updatePath, withoutSelectedCells])
 
-  const updateCellProp = useCallback((val: string | number, prop: 'opacity' | 'color' | 'shape') => {
+  const updateCellProp = useCallback((val: string | number, prop: 'opacity' | 'color' | 'glow' | 'shape') => {
     if (selectedKeys.length === 0) return
 
     updatePath(path.map((step) => ({
@@ -188,7 +190,7 @@ export default function CustomPatternEditor({
     })))
   }, [path, selectedKeys, selectedSet, updatePath])
 
-  const removeCellProp = useCallback((prop: 'color' | 'shape') => {
+  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'shape') => {
     if (selectedKeys.length === 0) return
 
     updatePath(path.map((step) => ({
@@ -220,6 +222,20 @@ export default function CustomPatternEditor({
         : step
     )))
   }, [activePath, path, safeActivePathIndex, updatePath])
+
+  const applyToAll = useCallback(() => {
+    updatePath(path.map((step) => ({
+      ...step,
+      cells: getStepCells(step).map((cell) => ({
+        ...cell,
+        opacity: selectedProps.opacity !== 100 ? selectedProps.opacity : undefined,
+        color: selectedProps.color !== options.color ? selectedProps.color : undefined,
+        glow: selectedProps.glow > 0 ? selectedProps.glow : undefined,
+        shape: selectedProps.shape,
+      })),
+      tracks: undefined,
+    })))
+  }, [options.color, path, selectedProps, updatePath])
 
   const undoLast = useCallback(() => {
     const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step), tracks: undefined }))
@@ -386,8 +402,9 @@ export default function CustomPatternEditor({
               >
                 Clear
               </button>
-            </div>
-          </section>
+              </div>
+              <button onClick={applyToAll} className="secondary-action">Apply to all animated cells</button>
+            </section>
 
           <section>
             <div className="inspector-row">
@@ -448,6 +465,21 @@ export default function CustomPatternEditor({
                   onChange={(e) => updateCellProp(Number(e.target.value), 'opacity')}
                 />
                 <strong>{selectedProps.opacity}%</strong>
+              </label>
+              <label className="mini-slider">
+                <span>Glow</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={50}
+                  step={2}
+                  value={selectedProps.glow}
+                  onChange={(e) => updateCellProp(Number(e.target.value), 'glow')}
+                />
+                <strong>{selectedProps.glow}</strong>
+                {selectedProps.glow > 0 && (
+                  <button className="text-button" onClick={() => removeCellProp('glow')}>Reset</button>
+                )}
               </label>
               <div className="inline-control">
                 <span>Color</span>
