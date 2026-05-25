@@ -270,7 +270,24 @@ export default function CustomPatternEditor({
     onHiddenCellsChange([])
   }, [onHiddenCellsChange, updatePath])
 
-  const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, 48))
+  const cellProps = useMemo(() => {
+    const colors = new Map<string, string>()
+    const shapes = new Map<string, CellShape>()
+    const glows = new Map<string, number>()
+    for (const step of path) {
+      const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+      for (const c of cells) {
+        const key = k(c.row, c.col)
+        if (c.color) colors.set(key, c.color)
+        if (c.shape) shapes.set(key, c.shape)
+        const g = c.glow ?? step.glow
+        if (g != null && g > 0) glows.set(key, g)
+      }
+    }
+    return { colors, shapes, glows }
+  }, [path])
+
+  const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, options.cellSize * 3.4))
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
   const showCreateGroup = selectedCount >= 2
@@ -385,7 +402,7 @@ export default function CustomPatternEditor({
             className="custom-grid"
             style={{
               gridTemplateColumns: `repeat(${options.gridSize}, ${editorCellSize}px)`,
-              gap: 6,
+              gap: options.gap,
             }}
           >
             {Array.from({ length: options.gridSize }, (_, row) =>
@@ -397,6 +414,10 @@ export default function CustomPatternEditor({
                 const isActivePath = placement?.pathIndex === safeActivePathIndex
                 const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
                 const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
+                const cellColor = cellProps.colors.get(key) ?? options.color
+                const cellGlow = cellProps.glows.get(key) ?? options.glow
+                const cellShape = cellProps.shapes.get(key) ?? options.shape
+                const customColor = cellProps.colors.has(key)
 
                 return (
                   <button
@@ -406,14 +427,18 @@ export default function CustomPatternEditor({
                       event.preventDefault()
                       toggleHiddenCell(row, col)
                     }}
-                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
-                    style={{ width: editorCellSize, height: editorCellSize }}
+                    className={`builder-cell tile-${cellShape} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                    style={{
+                      width: editorCellSize,
+                      height: editorCellSize,
+                      ...(!isSelected && cellGlow > 0 ? { boxShadow: `0 0 ${cellGlow / 2}px ${cellGlow * 2}px ${cellColor}40` } : {}),
+                    }}
                     aria-label={`Cell row ${row + 1}, column ${col + 1}`}
                   >
                     {hidden ? (
                       <span className="cell-mask" />
                     ) : placement ? (
-                      <span className="cell-index">{placement.cellIndex + 1}</span>
+                      <span className="cell-index" style={customColor ? { background: cellColor, color: '#030303' } : undefined}>{placement.cellIndex + 1}</span>
                     ) : null}
                   </button>
                 )

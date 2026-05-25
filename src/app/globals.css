@@ -680,6 +680,31 @@ button:disabled {
   background: rgba(255,255,255,0.1);
 }
 
+.builder-cell.tile-circle {
+  border-radius: 50%;
+}
+
+.builder-cell.tile-diamond {
+  border-radius: 4px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.builder-cell.tile-triangle {
+  border-radius: 4px;
+  clip-path: polygon(50% 6%, 94% 94%, 6% 94%);
+}
+
+.builder-cell.tile-hexagon {
+  border-radius: 4px;
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
+}
+
+.builder-cell.tile-diamond .cell-index,
+.builder-cell.tile-triangle .cell-index,
+.builder-cell.tile-hexagon .cell-index {
+  transform: scale(0.85);
+}
+
 .builder-cell.is-group .cell-index {
   border-color: rgba(255,255,255,0.38);
   background: #fff;
