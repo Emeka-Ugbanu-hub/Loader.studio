@@ -51,6 +51,7 @@ export default function CustomPatternEditor({
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [styleScope, setStyleScope] = useState<'selected' | 'path' | 'all'>('selected')
+  const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null)
 
   const hiddenSet = useMemo(() => new Set(hiddenCells), [hiddenCells])
   const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
@@ -318,6 +319,32 @@ export default function CustomPatternEditor({
     )))
   }, [path, updatePath])
 
+  const reversePath = useCallback((index: number) => {
+    updatePath(path.map((step, stepIndex) => (
+      stepIndex === index
+        ? { ...step, cells: [...getStepCells(step)].reverse() }
+        : step
+    )))
+  }, [path, updatePath])
+
+  const movePathUp = useCallback((index: number) => {
+    if (index <= 0) return
+    const nextPath = [...path]
+    const [step] = nextPath.splice(index, 1)
+    nextPath.splice(index - 1, 0, step)
+    updatePath(nextPath)
+    setActivePathIndex(index - 1)
+  }, [path, updatePath])
+
+  const movePathDown = useCallback((index: number) => {
+    if (index >= path.length - 1) return
+    const nextPath = [...path]
+    const [step] = nextPath.splice(index, 1)
+    nextPath.splice(index + 1, 0, step)
+    updatePath(nextPath)
+    setActivePathIndex(index + 1)
+  }, [path, updatePath])
+
   const timingSummary = useMemo(() => {
     if (path.length === 0) return ''
     const blocks: string[][] = [[labelForPath(0)]]
@@ -357,6 +384,7 @@ export default function CustomPatternEditor({
                 const placement = cellToPlacement.get(key)
                 const isSelected = selectedSet.has(key)
                 const isActivePath = placement?.pathIndex === safeActivePathIndex
+                const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
 
                 return (
                   <button
@@ -366,7 +394,7 @@ export default function CustomPatternEditor({
                       event.preventDefault()
                       toggleHiddenCell(row, col)
                     }}
-                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                    className={`builder-cell ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
                     style={{ width: editorCellSize, height: editorCellSize }}
                     aria-label={`Cell row ${row + 1}, column ${col + 1}`}
                   >
@@ -404,6 +432,8 @@ export default function CustomPatternEditor({
                 <div
                   key={`${index}-${getStepCells(step).length}`}
                   className={`path-chip ${index === safeActivePathIndex ? 'is-active' : ''}`}
+                  onMouseEnter={() => setHoveredPathIndex(index)}
+                  onMouseLeave={() => setHoveredPathIndex(null)}
                 >
                   <strong onClick={() => {
                     setActivePathIndex(index)
@@ -413,7 +443,31 @@ export default function CustomPatternEditor({
                     setActivePathIndex(index)
                     setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
                   }}>{getStepCells(step).length} cells</span>
-                  {step.buildAs === 'group' && <em>Group</em>}
+                  {step.buildAs === 'group' && (
+                    <em onClick={handleUngroup} title="Click to ungroup">
+                      Group
+                      <span className="ungroup-hint">✕</span>
+                    </em>
+                  )}
+                  <div className="path-chip-controls">
+                    <button
+                      className="reorder-btn"
+                      onClick={() => movePathUp(index)}
+                      disabled={index === 0}
+                      title="Move earlier"
+                    >▲</button>
+                    <button
+                      className="reorder-btn"
+                      onClick={() => movePathDown(index)}
+                      disabled={index === path.length - 1}
+                      title="Move later"
+                    >▼</button>
+                    <button
+                      className="reorder-btn reverse-btn"
+                      onClick={() => reversePath(index)}
+                      title="Reverse cell order"
+                    >↻</button>
+                  </div>
                   {index > 0 && (
                     <button
                       className="timing-toggle"
@@ -423,7 +477,7 @@ export default function CustomPatternEditor({
                       }}
                       title="Toggle start timing"
                     >
-                      Start: {step.timing === 'simultaneous' ? 'Together' : 'After prev'}
+                      {step.timing === 'simultaneous' ? 'Start together' : 'Start after'}
                     </button>
                   )}
                 </div>
@@ -470,7 +524,11 @@ export default function CustomPatternEditor({
             </div>
 
             {selectedCount === 0 && !showCreateGroup ? (
-              <p className="muted-copy">Click empty cells to build. Click numbered cells to edit.</p>
+              <p className="muted-copy">
+                {activePathIndex >= path.length && path.length > 0
+                  ? `Path ${labelForPath(path.length)} ready. Click cells to add steps.`
+                  : 'Click empty cells to build. Click numbered cells to edit.'}
+              </p>
             ) : (
               <div className="selection-tools">
                 {showCreateGroup && (
