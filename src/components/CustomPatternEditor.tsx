@@ -52,6 +52,7 @@ export default function CustomPatternEditor({
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [styleScope, setStyleScope] = useState<'selected' | 'path' | 'all'>('selected')
   const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null)
+  const [multiSelectMode, setMultiSelectMode] = useState(false)
 
   const hiddenSet = useMemo(() => new Set(hiddenCells), [hiddenCells])
   const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
@@ -151,23 +152,27 @@ export default function CustomPatternEditor({
     updatePath(nextPath)
   }, [cellToPlacement, hiddenSet, path, safeActivePathIndex, updatePath])
 
-  const handleCellClick = useCallback((row: number, col: number) => {
+  const handleCellClick = useCallback((row: number, col: number, shiftKey: boolean) => {
     const key = k(row, col)
     if (hiddenSet.has(key)) return
 
     const placement = cellToPlacement.get(key)
     if (placement) {
       setActivePathIndex(placement.pathIndex)
-      setSelectedKeys((keys) =>
-        keys.includes(key)
-          ? keys.filter((k) => k !== key)
-          : [...keys, key]
-      )
+      if (shiftKey || multiSelectMode) {
+        setSelectedKeys((keys) =>
+          keys.includes(key)
+            ? keys.filter((k) => k !== key)
+            : [...keys, key]
+        )
+      } else {
+        setSelectedKeys([key])
+      }
       return
     }
 
     appendCellToPath(row, col)
-  }, [appendCellToPath, cellToPlacement, hiddenSet])
+  }, [appendCellToPath, cellToPlacement, hiddenSet, multiSelectMode])
 
   const withoutSelectedCells = useCallback(() => (
     path.flatMap((step) => {
@@ -420,7 +425,7 @@ export default function CustomPatternEditor({
                 return (
                   <button
                     key={key}
-                    onClick={() => handleCellClick(row, col)}
+                    onClick={(e) => handleCellClick(row, col, e.shiftKey)}
                     onContextMenu={(event) => {
                       event.preventDefault()
                       toggleHiddenCell(row, col)
@@ -524,21 +529,17 @@ export default function CustomPatternEditor({
             )}
 
             <div className="path-actions">
-              <button
-                className={`path-action-primary ${activePathIndex >= path.length ? 'is-active' : ''}`}
-                onClick={() => {
-                  setSelectedKeys([])
-                  const cleanPath = path.filter((step) => getStepCells(step).length > 0)
-                  setActivePathIndex(cleanPath.length)
-                  if (cleanPath.length !== path.length) {
-                    updatePath(cleanPath)
-                  }
-                }}
-              >
-                {activePathIndex >= path.length && path.length > 0
-                  ? `Adding ${labelForPath(path.length)}`
-                  : 'New path'}
-              </button>
+              {activePath && getStepCells(activePath).length > 0 && (
+                <button
+                  className="path-action-primary"
+                  onClick={() => {
+                    setSelectedKeys([])
+                    setActivePathIndex(path.length)
+                  }}
+                >
+                  End path
+                </button>
+              )}
               <button
                 className="path-action-secondary"
                 onClick={undoLast}
@@ -567,8 +568,12 @@ export default function CustomPatternEditor({
             {selectedCount === 0 && !showCreateGroup ? (
               <p className="muted-copy">
                 {activePathIndex >= path.length && path.length > 0
-                  ? `Path ${labelForPath(path.length)} ready. Click cells to add steps.`
-                  : 'Click empty cells to build. Click numbered cells to edit.'}
+                  ? `Ready for ${labelForPath(path.length)}. Click a cell to start.`
+                  : activePath && getStepCells(activePath).length > 0
+                    ? `${labelForPath(safeActivePathIndex)} is open. End path when done.`
+                    : path.length === 0
+                      ? 'Click empty cells to build Path A.'
+                      : 'Click empty cells to build. Click numbered cells to edit.'}
               </p>
             ) : (
               <div className="selection-tools">
@@ -584,13 +589,17 @@ export default function CustomPatternEditor({
                 )}
                 {selectedCount > 0 && (
                   <>
-                    <strong>{selectedCount} selected</strong>
-                    <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
-                  </>
-                )}
-          {(selectedCount > 0 || path.length > 0) && (
-                  <>
-                    <strong>{selectedCount} selected</strong>
+                    <div className="inspector-row" style={{ marginTop: 4 }}>
+                      <strong>{selectedCount} selected</strong>
+                      <label className="multi-toggle">
+                        <input
+                          type="checkbox"
+                          checked={multiSelectMode}
+                          onChange={(e) => setMultiSelectMode(e.target.checked)}
+                        />
+                        <span>Select multiple</span>
+                      </label>
+                    </div>
                     <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
                   </>
                 )}

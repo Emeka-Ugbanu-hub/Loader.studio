@@ -975,6 +975,22 @@ button:disabled {
   cursor: default;
 }
 
+.multi-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #8e8e97;
+  cursor: pointer;
+}
+
+.multi-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: #fff;
+  cursor: pointer;
+}
+
 .path-actions {
   display: flex;
   flex-wrap: wrap;
