@@ -359,6 +359,11 @@ export default function CustomPatternEditor({
     )))
   }, [path, updatePath])
 
+  const handleReverse = useCallback((index: number) => {
+    reversePath(index)
+    setReversedIndex((prev) => prev === index ? null : index)
+  }, [reversePath])
+
   const movePathUp = useCallback((index: number) => {
     if (index <= 0) return
     const nextPath = [...path]
@@ -481,6 +486,7 @@ export default function CustomPatternEditor({
                     onClick={() => {
                       setActivePathIndex(index)
                       setSelectedKeys(getStepCells(step).map((cell) => k(cell.row, cell.col)))
+                      setReversedIndex(null)
                     }}
                   >
                     <strong>{labelForPath(index)}</strong>
@@ -502,11 +508,7 @@ export default function CustomPatternEditor({
                     >Later</button>
                     <button
                       className={`reverse-action ${reversedIndex === index ? 'is-active' : ''}`}
-                      onClick={() => {
-                        reversePath(index)
-                        setReversedIndex(index)
-                        setTimeout(() => setReversedIndex(null), 800)
-                      }}
+                      onClick={() => handleReverse(index)}
                     >Reverse</button>
                   </div>
                   {index > 0 && (
