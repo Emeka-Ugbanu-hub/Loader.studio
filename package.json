@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "deploy": "rm -rf out && next build && touch out/.nojekyll && npx gh-pages -d out -t true",
+    "deploy": "rm -rf out && next build && touch out/.nojekyll && npx gh-pages -d out",
     "start": "next start",
     "lint": "eslint"
   },
