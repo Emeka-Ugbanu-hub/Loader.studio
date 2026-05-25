@@ -527,7 +527,7 @@ export default function CustomPatternEditor({
 
             <div className="path-actions">
               <button
-                className="path-action-primary"
+                className={`path-action-primary ${activePathIndex >= path.length ? 'is-active' : ''}`}
                 onClick={() => {
                   setSelectedKeys([])
                   const cleanPath = path.filter((step) => getStepCells(step).length > 0)
@@ -537,7 +537,9 @@ export default function CustomPatternEditor({
                   }
                 }}
               >
-                New path
+                {activePathIndex >= path.length && path.length > 0
+                  ? `Adding ${labelForPath(path.length)}`
+                  : 'New path'}
               </button>
               <button
                 className="path-action-secondary"
