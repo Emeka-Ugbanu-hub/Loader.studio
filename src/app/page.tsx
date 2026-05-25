@@ -94,11 +94,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, mode, selectedPreset, customPath, hiddenCells])
 
-  const handleClearDraft = useCallback(() => {
-    try { localStorage.removeItem(DRAFT_KEY) } catch {}
-    setDraftStatus('idle')
-  }, [])
-
   const presetFrames = useMemo(
     () => patternGenerators[selectedPreset]?.(options.gridSize) ?? [],
     [selectedPreset, options.gridSize]
@@ -274,7 +269,6 @@ export default function Home() {
                 hiddenCells={hiddenCells}
                 onPathChange={handleCustomPathChange}
                 onHiddenCellsChange={handleHiddenCellsChange}
-                onClearDraft={handleClearDraft}
               />
             )}
           </div>
