@@ -11,7 +11,6 @@ interface Props {
   hiddenCells: string[]
   onPathChange: (path: CustomPathStep[], frames: number[][][]) => void
   onHiddenCellsChange: (hidden: string[]) => void
-  onOptionsChange: (update: Partial<LoaderOptions>) => void
 }
 
 function k(r: number, c: number) {
@@ -48,7 +47,6 @@ export default function CustomPatternEditor({
   hiddenCells,
   onPathChange,
   onHiddenCellsChange,
-  onOptionsChange,
 }: Props) {
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
@@ -632,17 +630,6 @@ export default function CustomPatternEditor({
           {selectedCount > 0 && (
             <section>
               <p className="inspector-label">Selected style</p>
-              <div className="control-row" style={{ padding: 0, marginBottom: 4 }}>
-                <span className="control-label">Trail</span>
-                <button
-                  type="button"
-                  onClick={() => onOptionsChange({ trail: !options.trail })}
-                  className={`toggle-switch ${options.trail ? 'is-active' : ''}`}
-                  aria-pressed={options.trail}
-                >
-                  <span />
-                </button>
-              </div>
               <div className="scope-toggle">
                 {(['selected', 'path', 'all'] as const).map((scope) => (
                   <button

@@ -269,7 +269,6 @@ export default function Home() {
                 hiddenCells={hiddenCells}
                 onPathChange={handleCustomPathChange}
                 onHiddenCellsChange={handleHiddenCellsChange}
-                onOptionsChange={handleOptionsChange}
               />
             )}
           </div>
