@@ -500,6 +500,7 @@ export default function CustomPatternEditor({
                       disabled={index === path.length - 1}
                     >Later</button>
                     <button
+                      className="reverse-action"
                       onClick={() => reversePath(index)}
                     >Reverse</button>
                   </div>

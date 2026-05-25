@@ -905,6 +905,17 @@ button:disabled {
   cursor: default;
 }
 
+.path-chip-actions .reverse-action {
+  border-color: rgba(255,255,255,0.14);
+  color: #b0b0b8;
+}
+
+.path-chip-actions .reverse-action:hover {
+  border-color: rgba(255,255,255,0.32);
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+}
+
 .timing-row {
   border: 1px solid rgba(255,255,255,0.09);
   border-radius: 10px;
