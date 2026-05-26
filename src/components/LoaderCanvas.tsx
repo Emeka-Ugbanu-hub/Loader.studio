@@ -3,6 +3,8 @@
 import { useRef, useEffect, useCallback, useMemo } from 'react'
 import type { LoaderOptions, CustomPathStep, CellShape } from '@/lib/types'
 import { drawCellShape } from '@/lib/drawCell'
+import { getCellMap, getVisualGrid, layoutCellShape } from '@/lib/gridLayout'
+import { getDisplayCellSize } from '@/lib/displaySizing'
 
 interface Props {
   options: LoaderOptions
@@ -75,15 +77,34 @@ export default function LoaderCanvas({
     return m
   }, [customPath])
 
+  const cellSizes = useMemo(() => {
+    const m = new Map<string, number>()
+    if (customPath) {
+      for (const step of customPath) {
+        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+        for (const c of cells) {
+          const s = c.size ?? step.size
+          if (s != null && s !== 1) m.set(k(c.row, c.col), s)
+        }
+      }
+    }
+    return m
+  }, [customPath])
+
   const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, frame: number[][]) => {
-    const { gridSize, cellSize, gap, color, shape: globalShape } = options
-    const baseTotalSize = gridSize * (cellSize + gap) - gap
-    const previewScale = Math.max(1, Math.min(4, (Math.min(w, h) * 0.72) / baseTotalSize))
-    const drawCellSize = cellSize * previewScale
-    const drawGap = gap * previewScale
-    const totalSize = gridSize * (drawCellSize + drawGap) - drawGap
-    const ox = (w - totalSize) / 2
-    const oy = (h - totalSize) / 2
+    const { gridSize, cellSize, gap, color, layout = 'matrix' } = options
+    const globalShape = layoutCellShape(layout, options.shape)
+    const availableSize = Math.min(w, h) * 0.92
+    const baseCellSize = getDisplayCellSize(gridSize, cellSize, 440)
+    const baseGap = gap
+    const baseGrid = getVisualGrid(layout, gridSize, baseCellSize, baseGap)
+    const fitScale = Math.min(1, availableSize / Math.max(baseGrid.width, baseGrid.height))
+    const drawCellSize = baseCellSize * fitScale
+    const drawGap = baseGap * fitScale
+    const visualGrid = getVisualGrid(layout, gridSize, drawCellSize, drawGap)
+    const cellMap = getCellMap(visualGrid)
+    const ox = (w - visualGrid.width) / 2
+    const oy = (h - visualGrid.height) / 2
     const hiddenSet = new Set(hiddenCells)
 
     ctx.clearRect(0, 0, w, h)
@@ -92,11 +113,13 @@ export default function LoaderCanvas({
       for (let r = 0; r < gridSize; r++) {
         for (let c = 0; c < gridSize; c++) {
           if (hiddenSet.has(`${r},${c}`)) continue
+          const visualCell = cellMap.get(k(r, c))
+          if (!visualCell?.visible) continue
           const bgShape = cellShapes.get(k(r, c)) ?? globalShape
-          const x = ox + c * (drawCellSize + drawGap)
-          const y = oy + r * (drawCellSize + drawGap)
+          const x = ox + visualCell.x
+          const y = oy + visualCell.y
           ctx.fillStyle = 'rgba(255,255,255,0.08)'
-          drawCellShape(ctx, x, y, drawCellSize, bgShape)
+          drawCellShape(ctx, x, y, drawCellSize, bgShape, visualCell.orientation)
         }
       }
     }
@@ -106,6 +129,8 @@ export default function LoaderCanvas({
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         if (hiddenSet.has(`${r},${c}`)) continue
+        const visualCell = cellMap.get(k(r, c))
+        if (!visualCell?.visible) continue
         const alpha = frame[r]?.[c]
         if (alpha != null && alpha > 0) {
           const key = k(r, c)
@@ -118,15 +143,19 @@ export default function LoaderCanvas({
             ctx.shadowBlur = glow * 2
             ctx.shadowColor = cellColor
           }
-          const x = ox + c * (drawCellSize + drawGap)
-          const y = oy + r * (drawCellSize + drawGap)
-          drawCellShape(ctx, x, y, drawCellSize, cellShape)
+          const x = ox + visualCell.x
+          const y = oy + visualCell.y
+          const size = cellSizes.get(key) ?? 1
+          const adjustedSize = drawCellSize * size
+          const sx = x + (drawCellSize - adjustedSize) / 2
+          const sy = y + (drawCellSize - adjustedSize) / 2
+          drawCellShape(ctx, sx, sy, adjustedSize, cellShape, visualCell.orientation)
           ctx.shadowBlur = 0
         }
       }
     }
     ctx.restore()
-  }, [options, showBgGrid, hiddenCells, cellColors, cellGlows, cellShapes])
+  }, [options, showBgGrid, hiddenCells, cellColors, cellGlows, cellSizes, cellShapes])
 
   useEffect(() => {
     const canvas = canvasRef.current

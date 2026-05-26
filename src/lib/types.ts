@@ -1,4 +1,5 @@
 export type CellShape = 'square' | 'circle' | 'diamond' | 'triangle' | 'hexagon'
+export type GridLayout = 'matrix' | 'hive' | 'circular' | 'isometric' | 'triangular'
 
 export interface LoaderOptions {
   gridSize: number
@@ -9,6 +10,7 @@ export interface LoaderOptions {
   speed: number
   glow: number
   shape: CellShape
+  layout: GridLayout
 }
 
 export interface Pattern {
@@ -24,6 +26,7 @@ export interface CustomPathPoint {
   glow?: number
   trail?: boolean
   shape?: CellShape
+  size?: number
 }
 
 export type MovementPattern = 'wave-lr' | 'wave-rl' | 'wave-tb' | 'wave-bt' | 'diagonal' | 'pulse'
@@ -40,6 +43,7 @@ export interface CustomPathStep {
   glow?: number
   trail?: boolean
   shape?: CellShape
+  size?: number
   pattern?: MovementPattern
   buildAs?: 'group' | 'singles'
   play?: 'together' | 'one-by-one'
@@ -61,4 +65,5 @@ export const DEFAULT_OPTIONS: LoaderOptions = {
   speed: 8,
   glow: 0,
   shape: 'square',
+  layout: 'matrix',
 }

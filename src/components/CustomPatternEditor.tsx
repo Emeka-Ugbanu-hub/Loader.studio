@@ -14,7 +14,6 @@ interface Props {
   hiddenCells: string[]
   onPathChange: (path: CustomPathStep[], frames: number[][][]) => void
   onHiddenCellsChange: (hidden: string[]) => void
-  onOptionsChange: (update: Partial<LoaderOptions>) => void
 }
 
 function k(r: number, c: number) {
@@ -60,7 +59,6 @@ export default function CustomPatternEditor({
   hiddenCells,
   onPathChange,
   onHiddenCellsChange,
-  onOptionsChange,
 }: Props) {
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
@@ -113,6 +111,7 @@ export default function CustomPatternEditor({
     let color = options.color
     let glow = options.glow
     let trail = false
+    let size = 1
     let shape: CellShape | undefined
 
     for (const cell of selectedCells) {
@@ -120,10 +119,11 @@ export default function CustomPatternEditor({
       if (cell.color) color = cell.color
       if (cell.glow != null) glow = cell.glow
       if (cell.trail != null) trail = cell.trail
+      if (cell.size != null) size = cell.size
       if (cell.shape) shape = cell.shape
     }
 
-    return { opacity, color, glow, trail, shape }
+    return { opacity, color, glow, trail, size, shape }
   }, [selectedCells, options.color, options.glow])
 
   const updatePath = useCallback((nextPath: CustomPathStep[]) => {
@@ -212,7 +212,7 @@ export default function CustomPatternEditor({
 
   const scopeKeys = useMemo(() => new Set(selectedKeys), [selectedKeys])
 
-  const updateCellProp = useCallback((val: string | number | boolean, prop: 'opacity' | 'color' | 'glow' | 'trail' | 'shape') => {
+  const updateCellProp = useCallback((val: string | number | boolean, prop: 'opacity' | 'color' | 'glow' | 'trail' | 'size' | 'shape') => {
     if (scopeKeys.size === 0) return
 
     updatePath(path.map((step) => ({
@@ -224,7 +224,7 @@ export default function CustomPatternEditor({
     })))
   }, [path, scopeKeys, updatePath])
 
-  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'trail' | 'shape') => {
+  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'trail' | 'size' | 'shape') => {
     if (scopeKeys.size === 0) return
 
     updatePath(path.map((step) => ({
@@ -289,6 +289,7 @@ export default function CustomPatternEditor({
     const colors = new Map<string, string>()
     const shapes = new Map<string, CellShape>()
     const glows = new Map<string, number>()
+    const sizes = new Map<string, number>()
     for (const step of path) {
       const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
       for (const c of cells) {
@@ -297,9 +298,11 @@ export default function CustomPatternEditor({
         if (c.shape) shapes.set(key, c.shape)
         const g = c.glow ?? step.glow
         if (g != null && g > 0) glows.set(key, g)
+        const s = c.size ?? step.size
+        if (s != null && s !== 1) sizes.set(key, s)
       }
     }
-    return { colors, shapes, glows }
+    return { colors, shapes, glows, sizes }
   }, [path])
 
   const editorCellSize = getDisplayCellSize(options.gridSize, options.cellSize, 440)
@@ -456,9 +459,9 @@ export default function CustomPatternEditor({
                 const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
                 const cellColor = cellProps.colors.get(key) ?? options.color
                 const cellGlow = cellProps.glows.get(key) ?? options.glow
-                const cellShape = cellProps.shapes.get(key) ?? layoutCellShape(options.layout ?? 'matrix', options.shape)
+                const cellShape = cellProps.shapes.get(key) ?? options.shape
+                const cellSize = cellProps.sizes.get(key) ?? 1
                 const customColor = cellProps.colors.has(key)
-                const editorGlow = Math.min(cellGlow, 6)
 
                 return (
                   <button
@@ -472,12 +475,8 @@ export default function CustomPatternEditor({
                     style={{
                       width: editorCellSize,
                       height: editorCellSize,
-                      ...(usesFreeformLayout ? {
-                        position: 'absolute',
-                        left: visualCell.x,
-                        top: visualCell.y,
-                      } : {}),
-                      ...(!isSelected && editorGlow > 0 ? { boxShadow: `0 0 ${editorGlow / 2}px ${editorGlow}px ${cellColor}18` } : {}),
+                      transform: cellSize !== 1 ? `scale(${cellSize})` : undefined,
+                      ...(!isSelected && cellGlow > 0 ? { boxShadow: `0 0 ${cellGlow / 2}px ${cellGlow * 2}px ${cellColor}40` } : {}),
                     }}
                     aria-label={`Cell row ${row + 1}, column ${col + 1}`}
                   >
@@ -735,13 +734,16 @@ export default function CustomPatternEditor({
                 <span>Size</span>
                 <input
                   type="range"
-                  min={4}
-                  max={24}
-                  step={1}
-                  value={options.cellSize}
-                  onChange={(e) => onOptionsChange({ cellSize: Number(e.target.value) })}
+                  min={50}
+                  max={200}
+                  step={10}
+                  value={(selectedProps.size ?? 1) * 100}
+                  onChange={(e) => updateCellProp(Number(e.target.value) / 100, 'size')}
                 />
-                <strong>{options.cellSize}px</strong>
+                <strong>{Math.round((selectedProps.size ?? 1) * 100)}%</strong>
+                {(selectedProps.size ?? 1) !== 1 && (
+                  <button className="text-button" onClick={() => removeCellProp('size')}>Reset</button>
+                )}
               </label>
               <div className="inline-control">
                 <span>Color</span>
