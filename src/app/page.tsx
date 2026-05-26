@@ -260,7 +260,6 @@ export default function Home() {
           <ControlsPanel
             options={options}
             onChange={handleOptionsChange}
-            colorLocked={mode === 'preset'}
           />
         </aside>
 
