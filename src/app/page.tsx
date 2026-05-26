@@ -7,7 +7,7 @@ import PresetGrid from '@/components/PresetGrid'
 import CustomPatternEditor from '@/components/CustomPatternEditor'
 import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderSVG } from '@/lib/svgExporter'
-import { applyTrailToFrames, generateCustomFrames, getPresetColor, patternGenerators, presetToCustomPath } from '@/lib/patterns'
+import { applyTrailToFrames, generateCustomFrames, patternGenerators, presetToCustomPath } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 import { layoutCellShape } from '@/lib/gridLayout'
 
@@ -126,8 +126,8 @@ export default function Home() {
   )
   const displayOptions = useMemo(() => ({
     ...options,
-    color: mode === 'preset' ? getPresetColor(selectedPreset) : options.color,
-  }), [options, mode, selectedPreset])
+    color: options.color,
+  }), [options])
 
   const layoutLabel = useMemo(() => {
     const label = options.layout ?? 'matrix'

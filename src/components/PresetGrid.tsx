@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import LoaderCanvas from './LoaderCanvas'
-import { applyTrailToFrames, getPresetColor, patternGenerators, presetNames } from '@/lib/patterns'
+import { applyTrailToFrames, patternGenerators, presetNames } from '@/lib/patterns'
 import type { LoaderOptions } from '@/lib/types'
 
 interface Props {
@@ -66,7 +66,7 @@ function PresetCard({
       <button className="preset-card-body" onClick={() => onSelect(name)} aria-pressed={isActive}>
         <div className="preset-canvas">
           <LoaderCanvas
-            options={{ ...options, color: getPresetColor(name), speed: 7 }}
+            options={{ ...options, speed: 7 }}
             frames={frames}
             size={132}
             showBgGrid
