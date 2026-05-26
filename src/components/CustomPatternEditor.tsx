@@ -513,6 +513,25 @@ export default function CustomPatternEditor({
               </InfoTip>
             </div>
 
+            {activePath && (
+              <div className="inspector-row" style={{ paddingBottom: 6 }}>
+                <span className="control-label">Accumulate</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updatePath(path.map((step, i) => (
+                      i === safeActivePathIndex
+                        ? { ...step, play: step.play === 'together' ? 'one-by-one' : 'together' }
+                        : step
+                    )))
+                  }}
+                  className={`toggle-switch ${activePath.play !== 'one-by-one' ? 'is-active' : ''}`}
+                >
+                  <span />
+                </button>
+              </div>
+            )}
+
             <div className="paths-scroll">
               <div className="path-strip">
                 {path.map((step, index) => (
