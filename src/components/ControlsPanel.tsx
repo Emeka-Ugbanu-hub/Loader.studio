@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useRef, useEffect } from 'react'
 import type { CellShape, GridLayout, LoaderOptions } from '@/lib/types'
 import InfoTip from './InfoTip'
 
@@ -27,6 +28,18 @@ const DEFAULT_LAYOUT_SHAPES: Partial<Record<GridLayout, CellShape>> = {
 
 export default function ControlsPanel({ options, onChange, colorLocked = false }: Props) {
   const activeLayout = options.layout ?? 'matrix'
+  const [layoutOpen, setLayoutOpen] = useState(false)
+  const layoutRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (layoutRef.current && !layoutRef.current.contains(e.target as Node)) {
+        setLayoutOpen(false)
+      }
+    }
+    if (layoutOpen) document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [layoutOpen])
 
   return (
     <div className="controls-panel">
@@ -86,23 +99,35 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
 
       <div>
         <div className="control-label">Layout</div>
-        <select
-          className="layout-select"
-          value={activeLayout}
-          onChange={(e) => {
-            const key = e.target.value as GridLayout
-            onChange({
-              layout: key,
-              ...(DEFAULT_LAYOUT_SHAPES[key] ? { shape: DEFAULT_LAYOUT_SHAPES[key] } : {}),
-            })
-          }}
-        >
-          {LAYOUTS.map((layout) => (
-            <option key={layout.key} value={layout.key}>
-              {layout.label} — {layout.note}
-            </option>
-          ))}
-        </select>
+        <div className="layout-dropdown" ref={layoutRef}>
+          <button
+            className="layout-trigger"
+            onClick={() => setLayoutOpen(!layoutOpen)}
+          >
+            <span>{LAYOUTS.find((l) => l.key === activeLayout)?.label ?? 'Matrix'}</span>
+            <span className="layout-chevron">{layoutOpen ? '▲' : '▼'}</span>
+          </button>
+          {layoutOpen && (
+            <div className="layout-menu">
+              {LAYOUTS.map((layout) => (
+                <button
+                  key={layout.key}
+                  className={`layout-option ${activeLayout === layout.key ? 'is-active' : ''}`}
+                  onClick={() => {
+                    onChange({
+                      layout: layout.key,
+                      ...(DEFAULT_LAYOUT_SHAPES[layout.key] ? { shape: DEFAULT_LAYOUT_SHAPES[layout.key] } : {}),
+                    })
+                    setLayoutOpen(false)
+                  }}
+                >
+                  <strong>{layout.label}</strong>
+                  <small>{layout.note}</small>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="control-row">
