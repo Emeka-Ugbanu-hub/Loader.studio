@@ -9,6 +9,7 @@ import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderSVG } from '@/lib/svgExporter'
 import { applyTrailToFrames, generateCustomFrames, getPresetColor, patternGenerators } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
+import { layoutCellShape } from '@/lib/gridLayout'
 
 const DRAFT_KEY = 'loader-studio:draft:v1'
 
@@ -29,6 +30,7 @@ const DEFAULT_OPTIONS: LoaderOptions = {
   speed: 8,
   glow: 0,
   shape: 'square',
+  layout: 'matrix',
 }
 
 function emptyFrame(size: number) {
@@ -51,13 +53,14 @@ export default function Home() {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (!raw) return
       const draft: DraftData = JSON.parse(raw)
+      const draftOptions = draft.options ? { ...DEFAULT_OPTIONS, ...draft.options } : undefined
       /* eslint-disable react-hooks/set-state-in-effect */
-      if (draft.options) setOptions(draft.options)
+      if (draftOptions) setOptions(draftOptions)
       if (draft.mode) setMode(draft.mode)
       if (draft.selectedPreset) setSelectedPreset(draft.selectedPreset)
       if (draft.customPath) {
         setCustomPath(draft.customPath)
-        setCustomFrames(generateCustomFrames(draft.customPath, draft.options?.gridSize ?? DEFAULT_OPTIONS.gridSize))
+        setCustomFrames(generateCustomFrames(draft.customPath, draftOptions?.gridSize ?? DEFAULT_OPTIONS.gridSize))
       }
       if (draft.hiddenCells) setHiddenCells(draft.hiddenCells)
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -125,6 +128,11 @@ export default function Home() {
     ...options,
     color: mode === 'preset' ? getPresetColor(selectedPreset) : options.color,
   }), [options, mode, selectedPreset])
+
+  const layoutLabel = useMemo(() => {
+    const label = options.layout ?? 'matrix'
+    return label.charAt(0).toUpperCase() + label.slice(1)
+  }, [options.layout])
 
   const selectedLabel = mode === 'preset'
     ? selectedPreset.replace(/-/g, ' ')
@@ -216,8 +224,8 @@ export default function Home() {
 
           <div className="preview-meta">
             <div>
-              <span>Grid</span>
-              <strong>{options.gridSize} x {options.gridSize}</strong>
+              <span>Layout</span>
+              <strong>{layoutLabel}</strong>
             </div>
             <div>
               <span>Speed</span>
@@ -225,7 +233,7 @@ export default function Home() {
             </div>
             <div>
               <span>Shape</span>
-              <strong>{options.shape}</strong>
+              <strong>{layoutCellShape(options.layout ?? 'matrix', options.shape)}</strong>
             </div>
             <div>
               <span>Trail</span>
@@ -233,12 +241,14 @@ export default function Home() {
             </div>
           </div>
 
-          <button onClick={handleCopySVG} className="primary-action">
-            {copied ? 'SVG copied' : 'Copy animated SVG'}
-          </button>
-          <button onClick={handleDownloadSVG} className="primary-action" style={{ marginTop: 8 }}>
-            Download SVG
-          </button>
+          <div className="export-actions">
+            <button onClick={handleCopySVG} className="primary-action">
+              {copied ? 'SVG copied' : 'Copy SVG'}
+            </button>
+            <button onClick={handleDownloadSVG} className="primary-action">
+              Download
+            </button>
+          </div>
 
           <ControlsPanel
             options={options}
@@ -251,9 +261,9 @@ export default function Home() {
           <div className="studio-hero">
             <div className="min-w-0">
               <p className="eyebrow">Create</p>
-              <h2 className="text-2xl font-medium text-white sm:text-3xl">Build a loader visually.</h2>
+              <h2 className="text-2xl font-medium text-white sm:text-3xl">Loader workspace</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
-                Start from a polished preset or draw your own animation path. Preview, style, and export stay in one place.
+                Pick a preset or draw paths directly on the grid. Preview, style, and export stay in one place.
               </p>
             </div>
 
@@ -292,6 +302,7 @@ export default function Home() {
                 hiddenCells={hiddenCells}
                 onPathChange={handleCustomPathChange}
                 onHiddenCellsChange={handleHiddenCellsChange}
+                onOptionsChange={handleOptionsChange}
               />
             )}
           </div>

@@ -14,6 +14,7 @@ interface Props {
   hiddenCells: string[]
   onPathChange: (path: CustomPathStep[], frames: number[][][]) => void
   onHiddenCellsChange: (hidden: string[]) => void
+  onOptionsChange: (update: Partial<LoaderOptions>) => void
 }
 
 function k(r: number, c: number) {
@@ -59,6 +60,7 @@ export default function CustomPatternEditor({
   hiddenCells,
   onPathChange,
   onHiddenCellsChange,
+  onOptionsChange,
 }: Props) {
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
@@ -728,6 +730,18 @@ export default function CustomPatternEditor({
                 {selectedProps.glow > 0 && (
                   <button className="text-button" onClick={() => removeCellProp('glow')}>Reset</button>
                 )}
+              </label>
+              <label className="mini-slider">
+                <span>Size</span>
+                <input
+                  type="range"
+                  min={4}
+                  max={24}
+                  step={1}
+                  value={options.cellSize}
+                  onChange={(e) => onOptionsChange({ cellSize: Number(e.target.value) })}
+                />
+                <strong>{options.cellSize}px</strong>
               </label>
               <div className="inline-control">
                 <span>Color</span>
