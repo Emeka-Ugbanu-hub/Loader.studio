@@ -3,6 +3,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { CellShape, CustomPathPoint, CustomPathStep, LoaderOptions, MovementPattern } from '@/lib/types'
 import { generateCustomFrames } from '@/lib/patterns'
+import { getCellMap, getVisualGrid, layoutCellShape } from '@/lib/gridLayout'
+import { getDisplayCellSize } from '@/lib/displaySizing'
+import InfoTip from './InfoTip'
 
 interface Props {
   options: LoaderOptions
@@ -29,17 +32,26 @@ function cellAlpha(cell: CustomPathPoint) {
   return cell.opacity ?? 100
 }
 
-const DIRECTIONS: { key: MovementPattern | undefined; label: string }[] = [
-  { key: undefined, label: 'Clicked order' },
-  { key: 'wave-lr', label: 'Left to right' },
-  { key: 'wave-rl', label: 'Right to left' },
-  { key: 'wave-tb', label: 'Top to bottom' },
-  { key: 'wave-bt', label: 'Bottom to top' },
-  { key: 'diagonal', label: 'Diagonal' },
-  { key: 'pulse', label: 'Pulse' },
+type MotionMode = 'clicked' | 'together' | MovementPattern
+
+const MOTION_OPTIONS: { value: MotionMode; label: string }[] = [
+  { value: 'clicked', label: 'Clicked order' },
+  { value: 'together', label: 'Together' },
+  { value: 'wave-lr', label: 'Left to right' },
+  { value: 'wave-rl', label: 'Right to left' },
+  { value: 'wave-tb', label: 'Top to bottom' },
+  { value: 'wave-bt', label: 'Bottom to top' },
+  { value: 'diagonal', label: 'Diagonal' },
+  { value: 'pulse', label: 'Pulse' },
 ]
 
 const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
+
+function getMotionMode(step?: CustomPathStep): MotionMode {
+  if (step?.play === 'together') return 'together'
+  if (step?.buildAs !== 'group') return 'clicked'
+  return step?.pattern ?? 'clicked'
+}
 
 export default function CustomPatternEditor({
   options,
@@ -50,7 +62,6 @@ export default function CustomPatternEditor({
 }: Props) {
   const [activePathIndex, setActivePathIndex] = useState(0)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
-  const [styleScope, setStyleScope] = useState<'selected' | 'path' | 'all'>('selected')
   const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null)
   const [multiSelectMode, setMultiSelectMode] = useState(false)
   const [reversedIndex, setReversedIndex] = useState<number | null>(null)
@@ -197,16 +208,7 @@ export default function CustomPatternEditor({
     setActivePathIndex((index) => Math.min(index, nextPath.length))
   }, [selectedKeys, updatePath, withoutSelectedCells])
 
-  const scopeKeys = useMemo(() => {
-    if (styleScope === 'selected') return new Set(selectedKeys)
-    if (styleScope === 'path' && activePath) {
-      return new Set(getStepCells(activePath).map((cell) => k(cell.row, cell.col)))
-    }
-    if (styleScope === 'all') {
-      return new Set(path.flatMap((step) => getStepCells(step).map((cell) => k(cell.row, cell.col))))
-    }
-    return new Set<string>()
-  }, [activePath, path, selectedKeys, styleScope])
+  const scopeKeys = useMemo(() => new Set(selectedKeys), [selectedKeys])
 
   const updateCellProp = useCallback((val: string | number | boolean, prop: 'opacity' | 'color' | 'glow' | 'trail' | 'shape') => {
     if (scopeKeys.size === 0) return
@@ -235,11 +237,16 @@ export default function CustomPatternEditor({
     })))
   }, [path, scopeKeys, updatePath])
 
-  const handleMotionChange = useCallback((direction: MovementPattern | undefined) => {
+  const handleMotionChange = useCallback((motion: MotionMode) => {
     if (!activePath) return
+
     updatePath(path.map((step, index) => (
       index === safeActivePathIndex
-        ? { ...step, pattern: direction }
+        ? {
+          ...step,
+          play: motion === 'together' ? 'together' : 'one-by-one',
+          pattern: motion === 'clicked' || motion === 'together' ? undefined : motion,
+        }
         : step
     )))
   }, [activePath, path, safeActivePathIndex, updatePath])
@@ -293,10 +300,19 @@ export default function CustomPatternEditor({
     return { colors, shapes, glows }
   }, [path])
 
-  const editorCellSize = Math.floor(Math.min(440 / options.gridSize - 6, options.cellSize * 3.4))
+  const editorCellSize = getDisplayCellSize(options.gridSize, options.cellSize, 440)
+  const visualGrid = useMemo(
+    () => getVisualGrid(options.layout ?? 'matrix', options.gridSize, editorCellSize, options.gap),
+    [editorCellSize, options.gap, options.gridSize, options.layout]
+  )
+  const visualCellMap = useMemo(() => getCellMap(visualGrid), [visualGrid])
+  const usesFreeformLayout = (options.layout ?? 'matrix') !== 'matrix'
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
   const showCreateGroup = selectedCount >= 2
+  const activeMotionOptions = activeIsGroup
+    ? MOTION_OPTIONS
+    : MOTION_OPTIONS.filter((option) => option.value === 'clicked' || option.value === 'together')
 
   const handleCreateGroup = useCallback(() => {
     if (selectedCount < 2) return
@@ -404,21 +420,32 @@ export default function CustomPatternEditor({
           <p className="eyebrow">Custom builder</p>
           <h3 className="panel-title small">Build ordered paths on the grid</h3>
         </div>
+        <InfoTip title="Custom builder">
+          <p>Click empty cells to draw an animation path. Numbered cells show the order they animate in.</p>
+          <p>Shortcuts: click a numbered cell to edit it, Shift-click numbered cells to multi-select, right-click a cell to mask it.</p>
+        </InfoTip>
       </div>
 
       <div className="builder-layout">
         <div className="builder-canvas-wrap">
 
           <div
-            className="custom-grid"
-            style={{
-              gridTemplateColumns: `repeat(${options.gridSize}, ${editorCellSize}px)`,
-              gap: options.gap,
-            }}
+            className={`custom-grid layout-${options.layout ?? 'matrix'}-grid ${usesFreeformLayout ? 'is-freeform' : ''} ${options.gap === 0 ? 'is-gapless' : ''}`}
+            style={usesFreeformLayout
+              ? {
+                width: visualGrid.width,
+                height: visualGrid.height,
+              }
+              : {
+                gridTemplateColumns: `repeat(${options.gridSize}, ${editorCellSize}px)`,
+                gap: options.gap,
+              }}
           >
             {Array.from({ length: options.gridSize }, (_, row) =>
               Array.from({ length: options.gridSize }, (_, col) => {
                 const key = k(row, col)
+                const visualCell = visualCellMap.get(key)
+                if (!visualCell?.visible) return null
                 const hidden = hiddenSet.has(key)
                 const placement = cellToPlacement.get(key)
                 const isSelected = selectedSet.has(key)
@@ -427,8 +454,9 @@ export default function CustomPatternEditor({
                 const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
                 const cellColor = cellProps.colors.get(key) ?? options.color
                 const cellGlow = cellProps.glows.get(key) ?? options.glow
-                const cellShape = cellProps.shapes.get(key) ?? options.shape
+                const cellShape = cellProps.shapes.get(key) ?? layoutCellShape(options.layout ?? 'matrix', options.shape)
                 const customColor = cellProps.colors.has(key)
+                const editorGlow = Math.min(cellGlow, 6)
 
                 return (
                   <button
@@ -438,11 +466,16 @@ export default function CustomPatternEditor({
                       event.preventDefault()
                       toggleHiddenCell(row, col)
                     }}
-                    className={`builder-cell tile-${cellShape} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                    className={`builder-cell tile-${cellShape} ${cellShape === 'triangle' && visualCell.orientation === 'down' ? 'tile-triangle-down' : ''} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
                     style={{
                       width: editorCellSize,
                       height: editorCellSize,
-                      ...(!isSelected && cellGlow > 0 ? { boxShadow: `0 0 ${cellGlow / 2}px ${cellGlow * 2}px ${cellColor}40` } : {}),
+                      ...(usesFreeformLayout ? {
+                        position: 'absolute',
+                        left: visualCell.x,
+                        top: visualCell.y,
+                      } : {}),
+                      ...(!isSelected && editorGlow > 0 ? { boxShadow: `0 0 ${editorGlow / 2}px ${editorGlow}px ${cellColor}18` } : {}),
                     }}
                     aria-label={`Cell row ${row + 1}, column ${col + 1}`}
                   >
@@ -473,6 +506,10 @@ export default function CustomPatternEditor({
           <section className="paths-section">
             <div className="inspector-row paths-section-header">
               <p className="inspector-label">Paths</p>
+              <InfoTip title="Paths">
+                <p>Each path is an animation layer. End path finishes the current path; the next empty cell starts a new one.</p>
+                <p>Earlier/Later changes path order. Reverse flips the cell order. Starts with previous makes that path animate at the same time as the one before it.</p>
+              </InfoTip>
             </div>
 
             <div className="paths-scroll">
@@ -565,6 +602,10 @@ export default function CustomPatternEditor({
           <section>
             <div className="inspector-row">
               <p className="inspector-label">Selection</p>
+              <InfoTip title="Selection">
+                <p>Selection is for editing cells that already exist in a path.</p>
+                <p>Click selects one cell. Shift-click adds more on desktop. Use Select multiple on touch devices. Create group turns selected cells into one grouped motion layer.</p>
+              </InfoTip>
               {selectedCount > 0 && (
                 <button className="text-button" onClick={() => setSelectedKeys([])}>Deselect</button>
               )}
@@ -594,7 +635,7 @@ export default function CustomPatternEditor({
                 )}
                 {selectedCount > 0 && (
                   <>
-                    <div className="inspector-row" style={{ marginTop: 4 }}>
+                    <div className="selection-meta">
                       <strong>{selectedCount} selected</strong>
                       <label className="multi-toggle">
                         <input
@@ -616,36 +657,39 @@ export default function CustomPatternEditor({
             <section>
               <div className="inspector-row">
                 <p className="inspector-label">Motion</p>
-                <button className="text-button" onClick={handleUngroup}>Ungroup</button>
+                <InfoTip title="Motion">
+                  <p>Motion controls how the active path reveals itself.</p>
+                  <p>Clicked order follows your cell order. Together reveals every cell in this path at once. Groups can also use wave and pulse motion.</p>
+                </InfoTip>
+                {activeIsGroup && (
+                  <button className="text-button" onClick={handleUngroup}>Ungroup</button>
+                )}
               </div>
-              <div className="direction-grid">
-                {DIRECTIONS.map((direction) => (
-                  <button
-                    key={direction.label}
-                    onClick={() => handleMotionChange(direction.key)}
-                    className={activePath.pattern === direction.key ? 'is-active' : ''}
-                  >
-                    {direction.label}
-                  </button>
-                ))}
-              </div>
+              <label className="select-control">
+                <span>Reveal</span>
+                <select
+                  value={getMotionMode(activePath)}
+                  onChange={(event) => handleMotionChange(event.target.value as MotionMode)}
+                >
+                  {activeMotionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </section>
           )}
 
           {selectedCount > 0 && (
             <section>
-              <p className="inspector-label">Selected style</p>
-              <div className="scope-toggle">
-                {(['selected', 'path', 'all'] as const).map((scope) => (
-                  <button
-                    key={scope}
-                    onClick={() => setStyleScope(scope)}
-                    className={`scope-button ${styleScope === scope ? 'is-active' : ''}`}
-                    disabled={scope === 'path' && !activePath}
-                  >
-                    {scope === 'selected' ? 'Selected' : scope === 'path' ? 'Path' : 'All animated'}
-                  </button>
-                ))}
+              <div className="inspector-row">
+                <p className="inspector-label">Selected style</p>
+                <InfoTip title="Selected style">
+                  <p>These controls change the currently selected cells.</p>
+                  <p>To style a whole path, click that path card first. It selects every cell in the path automatically.</p>
+                  <p>Trail adds a fade to motion. Opacity controls brightness. Glow affects the final animation while the editor keeps glow subtle so it stays usable.</p>
+                </InfoTip>
               </div>
               <div className="inline-control" style={{ marginTop: 4 }}>
                 <span>Trail</span>
@@ -702,7 +746,7 @@ export default function CustomPatternEditor({
                   <button
                     key={shape}
                     onClick={() => updateCellProp(shape, 'shape')}
-                    className={`shape-button ${(selectedProps.shape ?? options.shape) === shape ? 'is-active' : ''}`}
+                    className={`shape-button ${(selectedProps.shape ?? layoutCellShape(options.layout ?? 'matrix', options.shape)) === shape ? 'is-active' : ''}`}
                     title={shape}
                     aria-label={`Use ${shape} for selected cells`}
                   >
