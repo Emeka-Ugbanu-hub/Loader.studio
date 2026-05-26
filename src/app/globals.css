@@ -1120,21 +1120,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 540px;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   background: rgba(255,255,255,0.06);
-}
-
-.inspector-panel::-webkit-scrollbar {
-  width: 4px;
-}
-
-.inspector-panel::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255,255,255,0.12);
 }
 
 .inspector-panel section {
@@ -1173,7 +1160,6 @@ button:disabled {
   max-height: clamp(190px, 32vh, 300px);
   min-height: 0;
   overflow-y: auto;
-  scrollbar-gutter: stable;
 }
 
 .path-chip {
