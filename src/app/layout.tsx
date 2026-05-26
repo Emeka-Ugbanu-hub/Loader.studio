@@ -59,9 +59,9 @@ export const metadata: Metadata = {
     creator: "@emekaugbanu",
   },
   icons: {
-    icon: "/loader-studio-icon.svg",
-    shortcut: "/loader-studio-icon.svg",
-    apple: "/loader-studio-icon.svg",
+    icon: "loader-studio-icon.svg",
+    shortcut: "loader-studio-icon.svg",
+    apple: "loader-studio-icon.svg",
   },
 };
 
