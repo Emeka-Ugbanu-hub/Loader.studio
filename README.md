@@ -1,55 +1,47 @@
 # Loader.studio
 
-A visual pixel-grid loader generator for the web. Select cells, build custom animation paths, and export standalone HTML/JS loaders — no dependencies.
+Design pixel-grid animated loaders visually in your browser. Export a self-contained animated SVG — no JavaScript, no dependencies.
 
-## Features
+**[Open Loader.studio](https://emeka-ugbanu-hub.github.io/Loader.studio/)**
 
-- **Preset patterns** — spiral, pulse, wave, fill, snake, and more
-- **Custom builder** — click cells to build your own animation step by step
-- **Groups** — select multiple cells and animate them together with directional waves (left, right, top, bottom, diagonal, pulse)
-- **Per-cell styling** — override color, opacity, glow, and shape on individual cells
-- **Hidden cells** — right-click cells to hide them from the animation
-- **Live preview** — see your animation as you build it
-- **Export** — copy standalone HTML/JS code to use anywhere
+## How it works
 
-### Shapes
+1. Pick a **preset** (spiral, wave, corners, plus…) or switch to **Custom builder**
+2. In Custom mode, click empty cells to build paths. Click **End path** when done. Next click starts a new path.
+3. Select cells, then click **Create group** to animate them together with directional motion
+4. Use the **Selected style** panel to tweak color, opacity, glow, shape, and trail per cell or per path
+5. Copy or download an animated SVG — drops anywhere without code
 
-Each cell can be rendered as **square**, **circle**, **diamond**, **triangle**, or **hexagon** — set globally or per cell.
-
-## Usage
-
-1. Pick a **preset** from the grid or switch to **Custom** mode
-2. Click cells to add them to your animation path
-3. **Shift+click** to select multiple cells without adding to the path
-4. Click **Group selected cells** to create a multi-cell step with directional animation
-5. Use the **Cell Style** panel to customize color, opacity, glow, and shape per cell
-6. Adjust global settings (speed, color, glow, shape) in the sidebar
-7. Click **Copy Code** to export your loader
-
-### Interaction
+## Interaction
 
 | Action | Result |
 |--------|--------|
-| Click empty cell | Creates a step, selects the cell |
-| Click cell in group | Selects the entire group |
-| Shift+click any cell | Toggles that cell in/out of selection |
-| Right-click cell | Hides/unhides the cell |
-| Click Group button | Merges selected cells into a group step with wave-lr animation |
-| Click direction button | Changes the group's animation direction |
+| Click empty cell | Adds it to the active path |
+| Click numbered cell | Selects that cell for editing |
+| Shift + click numbered cell | Toggles cell in/out of multi-selection |
+| Right-click cell | Masks/unmasks the cell |
+| Select 2+ cells → Create group | Groups them with wave-lr animation |
+| End path | Closes current path; next click starts a new one |
+| **Delete** key | Remove selected cells |
+| **Esc** | Deselect all |
+| **G** | Create group from selected cells |
+
+## Styling
+
+- **Tile shape** — square, circle, diamond, triangle, hexagon (global or per cell)
+- **Glow** — slider per cell or global, rendered as SVG blur
+- **Trail** — per-cell trail effect in custom mode (global toggle for presets)
+- **Per-path timing** — each path controls **Starts after** or **Starts with** previous
+- **Timing summary** — shows `A + B → C + D` blocks under the path list
 
 ## Development
 
 ```bash
 npm install
-npm run dev      # development server
+npm run dev      # local dev server
 npm run build    # static export to out/
+npm run deploy   # build + push to gh-pages
 npm run lint     # lint check
 ```
 
-Built with [Next.js](https://nextjs.org), React, TypeScript, and Tailwind CSS.
-
-## Deploy
-
-The project includes a GitHub Actions workflow that builds and deploys to GitHub Pages automatically when pushing to `main`. Set the repo's Pages source to **GitHub Actions** and the workflow handles the rest.
-
-If deploying to a different sub-path, set `NEXT_PUBLIC_BASE_PATH` (e.g., `/my-loader`) in the build step.
+Built with Next.js, React, TypeScript, and Tailwind CSS.
