@@ -261,7 +261,10 @@ export function applyTrailToFrames(
 
 export function presetToCustomPath(name: string, gridSize: number): CustomPathStep[] {
   const n = gridSize
-  const toStep = (p: CustomPathPoint): CustomPathStep => ({ cells: [p] })
+  function step(pts: CustomPathPoint[]): CustomPathStep[] {
+    if (pts.length === 0) return []
+    return [{ cells: pts, buildAs: 'singles', play: 'one-by-one', timing: 'sequence' }]
+  }
 
   switch (name) {
     case 'spiral': {
@@ -275,28 +278,28 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
         if (top <= bottom) { for (let i = right; i >= left; i--) order.push([bottom, i]); bottom-- }
         if (left <= right) { for (let i = bottom; i >= top; i--) order.push([i, left]); left++ }
       }
-      return order.map(([r, c]) => ({ cells: [{ row: r, col: c }] }))
+      return step(order.map(([r, c]) => ({ row: r, col: c })))
     }
     case 'corners':
-      return [
+      return step([
         { row: 0, col: 0 },
         { row: 0, col: n - 1 },
         { row: n - 1, col: 0 },
         { row: n - 1, col: n - 1 },
-      ].map(toStep)
+      ])
     case 'plus': {
       const mid = Math.floor(n / 2)
       const pts: CustomPathPoint[] = []
       for (let i = 0; i < n; i++) pts.push({ row: mid, col: i })
       for (let i = 0; i < n; i++) if (i !== mid) pts.push({ row: i, col: mid })
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'triangle': {
       const pts: CustomPathPoint[] = []
       for (let r = 0; r < n; r++)
         for (let c = 0; c <= r; c++)
           pts.push({ row: r, col: c })
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'wave-lr': {
       const step: CustomPathStep = {
@@ -328,13 +331,13 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
     case 'tl-br': {
       const pts: CustomPathPoint[] = []
       for (let i = 0; i < n; i++) pts.push({ row: i, col: i })
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'i-left': {
       const mid = Math.floor(n / 2)
       const pts: CustomPathPoint[] = []
       for (let i = 0; i < n; i++) pts.push({ row: mid, col: i })
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'left-right': {
       const pts: CustomPathPoint[] = []
@@ -342,24 +345,24 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
         pts.push({ row: i, col: 0 })
         pts.push({ row: i, col: n - 1 })
       }
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'striangle': {
       const pts: CustomPathPoint[] = []
       for (let c = 0; c < n; c++)
         for (let r = 0; r <= c; r++)
           pts.push({ row: r, col: c })
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'scorners':
-      return [
+      return step([
         { row: 0, col: 0 },
         { row: 0, col: n - 1 },
         { row: Math.floor(n / 2), col: Math.floor(n / 2) },
         { row: n - 1, col: 0 },
         { row: n - 1, col: n - 1 },
         { row: Math.floor(n / 2), col: Math.floor(n / 2) },
-      ].map(toStep)
+      ])
     case 'pulse': {
       const step: CustomPathStep = {
         cells: [], buildAs: 'group', pattern: 'pulse', timing: 'sequence', play: 'one-by-one'
@@ -388,7 +391,7 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
       for (let r = 0; r < n; r++)
         for (let c = 0; c < n; c++)
           pts.push({ row: r, col: c })
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'snake': {
       const pts: CustomPathPoint[] = []
@@ -396,7 +399,7 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
         if (r % 2 === 0) for (let c = 0; c < n; c++) pts.push({ row: r, col: c })
         else for (let c = n - 1; c >= 0; c--) pts.push({ row: r, col: c })
       }
-      return pts.map(toStep)
+      return step(pts)
     }
     case 'cross': {
       const pts: CustomPathPoint[] = []
@@ -404,7 +407,7 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
         pts.push({ row: i, col: i })
         pts.push({ row: i, col: n - 1 - i })
       }
-      return pts.map(toStep)
+      return step(pts)
     }
     default:
       return []
