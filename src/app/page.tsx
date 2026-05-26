@@ -9,6 +9,7 @@ import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderSVG } from '@/lib/svgExporter'
 import { applyTrailToFrames, generateCustomFrames, patternGenerators, presetToCustomPath } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
+import { DEFAULT_OPTIONS } from '@/lib/types'
 import { layoutCellShape } from '@/lib/gridLayout'
 
 const DRAFT_KEY = 'loader-studio:draft:v1'
@@ -19,18 +20,6 @@ interface DraftData {
   selectedPreset: string
   customPath: CustomPathStep[]
   hiddenCells: string[]
-}
-
-const DEFAULT_OPTIONS: LoaderOptions = {
-  gridSize: 5,
-  cellSize: 14,
-  gap: 6,
-  color: '#ffffff',
-  trail: false,
-  speed: 8,
-  glow: 0,
-  shape: 'square',
-  layout: 'matrix',
 }
 
 function emptyFrame(size: number) {

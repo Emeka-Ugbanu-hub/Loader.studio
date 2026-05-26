@@ -15,7 +15,7 @@ export interface VisualGrid {
   height: number
 }
 
-export function visualCellKey(row: number, col: number) {
+function visualCellKey(row: number, col: number) {
   return `${row},${col}`
 }
 

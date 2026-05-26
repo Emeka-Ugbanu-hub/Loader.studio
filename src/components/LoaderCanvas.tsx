@@ -1,10 +1,11 @@
 'use client'
 
 import { useRef, useEffect, useCallback, useMemo } from 'react'
-import type { LoaderOptions, CustomPathStep, CellShape } from '@/lib/types'
+import type { LoaderOptions, CustomPathStep } from '@/lib/types'
 import { drawCellShape } from '@/lib/drawCell'
 import { getCellMap, getVisualGrid, layoutCellShape } from '@/lib/gridLayout'
 import { getDisplayCellSize } from '@/lib/displaySizing'
+import { cellKey, extractCellProps } from '@/lib/utils'
 
 interface Props {
   options: LoaderOptions
@@ -18,8 +19,6 @@ interface Props {
   hiddenCells?: readonly string[]
   customPath?: CustomPathStep[]
 }
-
-function k(r: number, c: number) { return `${r},${c}` }
 
 export default function LoaderCanvas({
   options,
@@ -39,57 +38,10 @@ export default function LoaderCanvas({
   const accumulatedRef = useRef(0)
   const rafRef = useRef<number>(0)
 
-  const cellGlows = useMemo(() => {
-    const m = new Map<string, number>()
-    if (customPath) {
-      for (const step of customPath) {
-        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-        for (const c of cells) {
-          const g = c.glow ?? step.glow
-          if (g != null && g > 0) m.set(k(c.row, c.col), g)
-        }
-      }
-    }
-    return m
-  }, [customPath])
-
-  const cellColors = useMemo(() => {
-    const m = new Map<string, string>()
-    if (customPath) {
-      for (const step of customPath) {
-        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-        for (const c of cells)
-          if (c.color) m.set(k(c.row, c.col), c.color)
-      }
-    }
-    return m
-  }, [customPath])
-
-  const cellShapes = useMemo(() => {
-    const m = new Map<string, CellShape>()
-    if (customPath) {
-      for (const step of customPath) {
-        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-        for (const c of cells)
-          if (c.shape) m.set(k(c.row, c.col), c.shape)
-      }
-    }
-    return m
-  }, [customPath])
-
-  const cellSizes = useMemo(() => {
-    const m = new Map<string, number>()
-    if (customPath) {
-      for (const step of customPath) {
-        const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-        for (const c of cells) {
-          const s = c.size ?? step.size
-          if (s != null && s !== 1) m.set(k(c.row, c.col), s)
-        }
-      }
-    }
-    return m
-  }, [customPath])
+  const cellProps = useMemo(
+    () => customPath ? extractCellProps(customPath) : { colors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() },
+    [customPath]
+  )
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, frame: number[][]) => {
     const { gridSize, cellSize, gap, color, layout = 'matrix' } = options
@@ -113,9 +65,9 @@ export default function LoaderCanvas({
       for (let r = 0; r < gridSize; r++) {
         for (let c = 0; c < gridSize; c++) {
           if (hiddenSet.has(`${r},${c}`)) continue
-          const visualCell = cellMap.get(k(r, c))
+          const visualCell = cellMap.get(cellKey(r, c))
           if (!visualCell?.visible) continue
-          const bgShape = cellShapes.get(k(r, c)) ?? globalShape
+          const bgShape = cellProps.shapes.get(cellKey(r, c)) ?? globalShape
           const x = ox + visualCell.x
           const y = oy + visualCell.y
           ctx.fillStyle = 'rgba(255,255,255,0.08)'
@@ -129,14 +81,14 @@ export default function LoaderCanvas({
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
         if (hiddenSet.has(`${r},${c}`)) continue
-        const visualCell = cellMap.get(k(r, c))
+        const visualCell = cellMap.get(cellKey(r, c))
         if (!visualCell?.visible) continue
         const alpha = frame[r]?.[c]
         if (alpha != null && alpha > 0) {
-          const key = k(r, c)
-          const cellColor = cellColors.get(key) || color
-          const cellShape = cellShapes.get(key) ?? globalShape
-          const glow = cellGlows.get(key) ?? options.glow
+          const key = cellKey(r, c)
+          const cellColor = cellProps.colors.get(key) || color
+          const cellShape = cellProps.shapes.get(key) ?? globalShape
+          const glow = cellProps.glows.get(key) ?? options.glow
           ctx.globalAlpha = alpha
           ctx.fillStyle = cellColor
           if (glow > 0) {
@@ -145,7 +97,7 @@ export default function LoaderCanvas({
           }
           const x = ox + visualCell.x
           const y = oy + visualCell.y
-          const size = cellSizes.get(key) ?? 1
+          const size = cellProps.sizes.get(key) ?? 1
           const adjustedSize = drawCellSize * size
           const sx = x + (drawCellSize - adjustedSize) / 2
           const sy = y + (drawCellSize - adjustedSize) / 2
@@ -155,7 +107,7 @@ export default function LoaderCanvas({
       }
     }
     ctx.restore()
-  }, [options, showBgGrid, hiddenCells, cellColors, cellGlows, cellSizes, cellShapes])
+  }, [options, showBgGrid, hiddenCells, cellProps])
 
   useEffect(() => {
     const canvas = canvasRef.current

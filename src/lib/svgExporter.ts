@@ -1,9 +1,6 @@
-import type { LoaderOptions, CustomPathStep, CellShape } from './types'
+import type { LoaderOptions, CustomPathStep } from './types'
 import { getCellMap, getVisualGrid, layoutCellShape } from './gridLayout'
-
-function k(r: number, c: number) {
-  return `${r},${c}`
-}
+import { cellKey, extractCellProps } from './utils'
 
 export function generateLoaderSVG(
   options: LoaderOptions,
@@ -18,16 +15,17 @@ export function generateLoaderSVG(
   const dur = frames.length / speed
   const hiddenSet = new Set(hiddenCells ?? [])
 
-  const cellColors = buildColorMap(customPath, defaultColor)
-  const cellShapes = buildShapeMap(customPath, defaultShape)
-  const cellGlows = buildGlowMap(customPath, defaultGlow)
-  const cellSizes = buildSizeMap(customPath)
+  const props = customPath ? extractCellProps(customPath) : { colors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() }
+  const cellColors = props.colors
+  const cellShapes = props.shapes
+  const cellGlows = props.glows
+  const cellSizes = props.sizes
 
   const cellFrames: Map<string, number[]> = new Map()
   for (let f = 0; f < frames.length; f++) {
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        const key = k(r, c)
+        const key = cellKey(r, c)
         const visualCell = cellMap.get(key)
         if (!visualCell?.visible) continue
         if (hiddenSet.has(key)) continue
@@ -132,56 +130,4 @@ export function generateLoaderSVG(
   </defs>` : ''}
   <rect width="100%" height="100%" fill="transparent"/>${shapes}
 </svg>`
-}
-
-function buildColorMap(path: CustomPathStep[] | undefined, defaultColor: string): Map<string, string> {
-  const m = new Map<string, string>()
-  if (!path) return m
-  for (const step of path) {
-    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-    for (const c of cells) {
-      const col = c.color ?? step.color
-      if (col && col !== defaultColor) m.set(k(c.row, c.col), col)
-    }
-  }
-  return m
-}
-
-function buildShapeMap(path: CustomPathStep[] | undefined, defaultShape: CellShape): Map<string, CellShape> {
-  const m = new Map<string, CellShape>()
-  if (!path) return m
-  for (const step of path) {
-    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-    for (const c of cells) {
-      const s = c.shape ?? step.shape
-      if (s && s !== defaultShape) m.set(k(c.row, c.col), s)
-    }
-  }
-  return m
-}
-
-function buildSizeMap(path: CustomPathStep[] | undefined): Map<string, number> {
-  const m = new Map<string, number>()
-  if (!path) return m
-  for (const step of path) {
-    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-    for (const c of cells) {
-      const s = c.size ?? step.size
-      if (s != null && s !== 1) m.set(k(c.row, c.col), s)
-    }
-  }
-  return m
-}
-
-function buildGlowMap(path: CustomPathStep[] | undefined, defaultGlow: number): Map<string, number> {
-  const m = new Map<string, number>()
-  if (!path) return m
-  for (const step of path) {
-    const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-    for (const c of cells) {
-      const g = c.glow ?? step.glow ?? defaultGlow
-      if (g > 0) m.set(k(c.row, c.col), g)
-    }
-  }
-  return m
 }

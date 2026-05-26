@@ -746,8 +746,3 @@ export const patternGenerators: Record<string, (n: number) => number[][][]> = {
 }
 
 export const presetNames = Object.keys(patternGenerators)
-
-export function getPresetColor(name: string): string {
-  void name
-  return '#ffffff'
-}

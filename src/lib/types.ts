@@ -13,11 +13,6 @@ export interface LoaderOptions {
   layout: GridLayout
 }
 
-export interface Pattern {
-  name: string
-  frames: number[][][]
-}
-
 export interface CustomPathPoint {
   row: number
   col: number
@@ -50,11 +45,6 @@ export interface CustomPathStep {
   timing?: 'sequence' | 'simultaneous'
   accumulate?: boolean
   tracks?: CustomParallelTrack[]
-}
-
-export interface HiddenCell {
-  row: number
-  col: number
 }
 
 export const DEFAULT_OPTIONS: LoaderOptions = {
