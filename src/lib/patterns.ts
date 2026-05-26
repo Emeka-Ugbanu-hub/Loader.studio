@@ -111,6 +111,10 @@ function layerToFrames(step: CustomPathStep, gridSize: number): number[][][] {
     return cellsToTogetherFrame(cells, gridSize, step.opacity)
   }
 
+  if (step.pattern && step.accumulate) {
+    return cellsToSequenceFrames(cells, gridSize, step.opacity)
+  }
+
   if (step.pattern) {
     return trackToFrames({ cells, pattern: step.pattern }, gridSize, step.opacity)
   }

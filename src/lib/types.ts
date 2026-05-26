@@ -48,6 +48,7 @@ export interface CustomPathStep {
   buildAs?: 'group' | 'singles'
   play?: 'together' | 'one-by-one'
   timing?: 'sequence' | 'simultaneous'
+  accumulate?: boolean
   tracks?: CustomParallelTrack[]
 }
 

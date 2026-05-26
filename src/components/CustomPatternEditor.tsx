@@ -521,11 +521,11 @@ export default function CustomPatternEditor({
                   onClick={() => {
                     updatePath(path.map((step, i) => (
                       i === safeActivePathIndex
-                        ? { ...step, play: step.play === 'together' ? 'one-by-one' : 'together' }
+                        ? { ...step, accumulate: !step.accumulate }
                         : step
                     )))
                   }}
-                  className={`toggle-switch ${activePath.play !== 'one-by-one' ? 'is-active' : ''}`}
+                  className={`toggle-switch ${activePath.accumulate ? 'is-active' : ''}`}
                 >
                   <span />
                 </button>
