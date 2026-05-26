@@ -434,6 +434,71 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
       }
       return step(pts)
     }
+    case 'checkerboard': {
+      const pts: CustomPathPoint[] = []
+      for (let sum = 0; sum <= (n - 1) * 2; sum++)
+        for (let r = 0; r < n; r++) {
+          const c = sum - r
+          if (c >= 0 && c < n) pts.push({ row: r, col: c })
+        }
+      return step(pts)
+    }
+    case 'zigzag': {
+      const pts: CustomPathPoint[] = []
+      for (let c = 0; c < n; c++) {
+        if (c % 2 === 0)
+          for (let r = 0; r < n; r++) pts.push({ row: r, col: c })
+        else
+          for (let r = n - 1; r >= 0; r--) pts.push({ row: r, col: c })
+      }
+      return step(pts)
+    }
+    case 'rings': {
+      const pts: CustomPathPoint[] = []
+      const mid = Math.floor(n / 2)
+      for (let radius = 0; radius <= mid; radius++)
+        for (let r = 0; r < n; r++)
+          for (let c = 0; c < n; c++)
+            if (Math.max(Math.abs(r - mid), Math.abs(c - mid)) === radius)
+              pts.push({ row: r, col: c })
+      return step(pts)
+    }
+    case 'hourglass': {
+      const pts: CustomPathPoint[] = []
+      for (let i = 0; i < n; i++) {
+        pts.push({ row: i, col: i })
+        pts.push({ row: i, col: n - 1 - i })
+      }
+      for (let i = n - 1; i >= 0; i--) {
+        pts.push({ row: n - 1 - i, col: Math.floor(n / 2) })
+        pts.push({ row: Math.floor(n / 2), col: i })
+      }
+      return step(pts)
+    }
+    case 'arrows': {
+      const pts: CustomPathPoint[] = []
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          if (c === r || c === n - 1 - r || r === 0 || c === 0 || r === n - 1 || c === n - 1)
+            pts.push({ row: r, col: c })
+      return step(pts)
+    }
+    case 'random': {
+      const pts: CustomPathPoint[] = []
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          pts.push({ row: r, col: c })
+      let seed = 42
+      function next() {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff
+        return seed / 0x7fffffff
+      }
+      for (let i = pts.length - 1; i > 0; i--) {
+        const j = Math.floor(next() * (i + 1));
+        [pts[i], pts[j]] = [pts[j], pts[i]]
+      }
+      return step(pts)
+    }
     default:
       return []
   }
@@ -604,6 +669,77 @@ export const patternGenerators: Record<string, (n: number) => number[][][]> = {
     for (let i = 0; i < n; i++) {
       pts.push({ row: i, col: i })
       pts.push({ row: i, col: n - 1 - i })
+    }
+    return pathToFrames(pts.map(pointToStep), n)
+  },
+
+  checkerboard: (n) => {
+    const pts: CustomPathPoint[] = []
+    for (let sum = 0; sum <= (n - 1) * 2; sum++)
+      for (let r = 0; r < n; r++) {
+        const c = sum - r
+        if (c >= 0 && c < n) pts.push({ row: r, col: c })
+      }
+    return pathToFrames(pts.map(pointToStep), n)
+  },
+
+  zigzag: (n) => {
+    const pts: CustomPathPoint[] = []
+    for (let c = 0; c < n; c++) {
+      if (c % 2 === 0)
+        for (let r = 0; r < n; r++) pts.push({ row: r, col: c })
+      else
+        for (let r = n - 1; r >= 0; r--) pts.push({ row: r, col: c })
+    }
+    return pathToFrames(pts.map(pointToStep), n)
+  },
+
+  rings: (n) => {
+    const pts: CustomPathPoint[] = []
+    const mid = Math.floor(n / 2)
+    for (let radius = 0; radius <= mid; radius++)
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          if (Math.max(Math.abs(r - mid), Math.abs(c - mid)) === radius)
+            pts.push({ row: r, col: c })
+    return pathToFrames(pts.map(pointToStep), n)
+  },
+
+  hourglass: (n) => {
+    const pts: CustomPathPoint[] = []
+    for (let i = 0; i < n; i++) {
+      pts.push({ row: i, col: i })
+      pts.push({ row: i, col: n - 1 - i })
+    }
+    for (let i = n - 1; i >= 0; i--) {
+      pts.push({ row: n - 1 - i, col: Math.floor(n / 2) })
+      pts.push({ row: Math.floor(n / 2), col: i })
+    }
+    return pathToFrames(pts.map(pointToStep), n)
+  },
+
+  arrows: (n) => {
+    const pts: CustomPathPoint[] = []
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        if (c === r || c === n - 1 - r || r === 0 || c === 0 || r === n - 1 || c === n - 1)
+          pts.push({ row: r, col: c })
+    return pathToFrames(pts.map(pointToStep), n)
+  },
+
+  random: (n) => {
+    const pts: CustomPathPoint[] = []
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        pts.push({ row: r, col: c })
+    let seed = 42
+    function next() {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      return seed / 0x7fffffff
+    }
+    for (let i = pts.length - 1; i > 0; i--) {
+      const j = Math.floor(next() * (i + 1));
+      [pts[i], pts[j]] = [pts[j], pts[i]]
     }
     return pathToFrames(pts.map(pointToStep), n)
   },

@@ -30,6 +30,12 @@ const PRESET_DETAILS: Record<string, { label: string; mood: string; group: 'Path
   fill: { label: 'Fill', mood: 'Full reveal', group: 'Bursts' },
   snake: { label: 'Snake', mood: 'Serpentine', group: 'Paths' },
   cross: { label: 'Cross', mood: 'Sharp mark', group: 'Bursts' },
+  checkerboard: { label: 'Checkers', mood: 'Diagonal fill', group: 'Waves' },
+  zigzag: { label: 'Zigzag', mood: 'Column bounce', group: 'Waves' },
+  rings: { label: 'Rings', mood: 'Layer bloom', group: 'Bursts' },
+  hourglass: { label: 'Hourglass', mood: 'Converging center', group: 'Paths' },
+  arrows: { label: 'Arrows', mood: 'Directional cues', group: 'Paths' },
+  random: { label: 'Random', mood: 'Scattered reveal', group: 'Bursts' },
 }
 
 const GROUPS = ['All', 'Paths', 'Waves', 'Bursts'] as const
