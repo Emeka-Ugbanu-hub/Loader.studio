@@ -103,22 +103,49 @@ function getHiveGrid(gridSize: number, cellSize: number, gap: number): VisualGri
 function getCircularGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
   const step = cellSize + gap
   const center = (gridSize - 1) / 2
-  const radius = gridSize / 2
+  const maxRings = Math.ceil(gridSize / 2)
   const rawCells: VisualCell[] = []
 
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
-      const dx = col - center
-      const dy = row - center
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      const visible = dist <= radius + 0.3
-      rawCells.push({
-        row,
-        col,
-        x: col * step,
-        y: row * step,
-        visible,
+      rawCells.push({ row, col, x: 0, y: 0, visible: false })
+    }
+  }
+
+  const ringPositions: { x: number; y: number }[] = []
+  for (let ring = 0; ring <= maxRings; ring++) {
+    const cellCount = ring === 0 ? 1 : Math.max(6, Math.round(2 * Math.PI * ring * 0.7))
+    for (let i = 0; i < cellCount; i++) {
+      const angle = (2 * Math.PI * i) / cellCount - Math.PI / 2
+      ringPositions.push({
+        x: center * step + Math.cos(angle) * ring * step,
+        y: center * step + Math.sin(angle) * ring * step,
       })
+    }
+  }
+
+  const used = new Set<number>()
+  for (const pos of ringPositions) {
+    let bestIdx = -1
+    let bestDist = Infinity
+    for (let i = 0; i < rawCells.length; i++) {
+      if (used.has(i)) continue
+      const r = Math.floor(i / gridSize)
+      const c = i % gridSize
+      const cx = c * step + cellSize / 2
+      const cy = r * step + cellSize / 2
+      const d = Math.abs(cx - pos.x) + Math.abs(cy - pos.y)
+      if (d < bestDist) { bestDist = d; bestIdx = i }
+    }
+    if (bestIdx >= 0) {
+      used.add(bestIdx)
+      rawCells[bestIdx] = {
+        row: Math.floor(bestIdx / gridSize),
+        col: bestIdx % gridSize,
+        x: pos.x - cellSize / 2,
+        y: pos.y - cellSize / 2,
+        visible: true,
+      }
     }
   }
 
