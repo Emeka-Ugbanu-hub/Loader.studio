@@ -101,37 +101,42 @@ function getHiveGrid(gridSize: number, cellSize: number, gap: number): VisualGri
 }
 
 function getCircularGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
-  const stepX = cellSize + gap
-  const stepY = cellSize * 0.866 + gap
-  const rawCells: VisualCell[] = []
+  const spacing = cellSize + gap
+  const positions: { x: number; y: number }[] = []
 
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      const rowOffset = row % 2 === 0 ? 0 : 0.5
-      rawCells.push({
-        row,
-        col,
-        x: (col + rowOffset) * stepX,
-        y: row * stepY,
-        visible: true,
+  // Center cell
+  positions.push({ x: 0, y: 0 })
+
+  // Concentric rings — each ring n has radius n*spacing and ~2πn cells
+  let ring = 1
+  while (positions.length < gridSize * gridSize) {
+    const radius = ring * spacing
+    const cellCount = Math.max(6, Math.round(2 * Math.PI * ring))
+    const remaining = gridSize * gridSize - positions.length
+    const count = Math.min(cellCount, remaining)
+
+    for (let i = 0; i < count; i++) {
+      const angle = (2 * Math.PI * i) / count - Math.PI / 2
+      positions.push({
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
       })
     }
+    ring++
   }
 
-  const minX = Math.min(...rawCells.map((c) => c.x))
-  const maxX = Math.max(...rawCells.map((c) => c.x))
-  const minY = Math.min(...rawCells.map((c) => c.y))
-  const maxY = Math.max(...rawCells.map((c) => c.y))
-
-  const cx = (minX + maxX + cellSize) / 2
-  const cy = (minY + maxY + cellSize) / 2
-  // Slightly shrink radius so no edge cells stick out
-  const radius = (Math.min(maxX - minX + cellSize, maxY - minY + cellSize) / 2) * 0.98
-
-  for (const cell of rawCells) {
-    const dx = cell.x + cellSize / 2 - cx
-    const dy = cell.y + cellSize / 2 - cy
-    cell.visible = Math.hypot(dx, dy) <= radius
+  const rawCells: VisualCell[] = []
+  for (let i = 0; i < gridSize * gridSize; i++) {
+    const p = positions[i]
+    const r = Math.floor(i / gridSize)
+    const c = i % gridSize
+    rawCells.push({
+      row: r,
+      col: c,
+      x: p.x - cellSize / 2,
+      y: p.y - cellSize / 2,
+      visible: true,
+    })
   }
 
   return normalizeGrid(rawCells, cellSize, true)
