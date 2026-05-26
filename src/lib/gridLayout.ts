@@ -103,7 +103,7 @@ function getHiveGrid(gridSize: number, cellSize: number, gap: number): VisualGri
 function getCircularGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
   const step = cellSize + gap
   const center = (gridSize - 1) / 2
-  const maxRings = Math.ceil(gridSize / 2)
+  const totalCells = gridSize * gridSize
   const rawCells: VisualCell[] = []
 
   for (let row = 0; row < gridSize; row++) {
@@ -113,9 +113,9 @@ function getCircularGrid(gridSize: number, cellSize: number, gap: number): Visua
   }
 
   const ringPositions: { x: number; y: number }[] = []
-  for (let ring = 0; ring <= maxRings; ring++) {
-    const cellCount = ring === 0 ? 1 : Math.max(6, Math.round(2 * Math.PI * ring * 0.7))
-    for (let i = 0; i < cellCount; i++) {
+  for (let ring = 0; ringPositions.length < totalCells; ring++) {
+    const cellCount = ring === 0 ? 1 : Math.max(6, Math.round(2 * Math.PI * ring))
+    for (let i = 0; i < cellCount && ringPositions.length < totalCells; i++) {
       const angle = (2 * Math.PI * i) / cellCount - Math.PI / 2
       ringPositions.push({
         x: center * step + Math.cos(angle) * ring * step,
