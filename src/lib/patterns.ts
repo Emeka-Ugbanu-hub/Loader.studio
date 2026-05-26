@@ -107,12 +107,12 @@ function layerToFrames(step: CustomPathStep, gridSize: number): number[][][] {
       : cellsToSequenceFrames(cells, gridSize, step.opacity)
   }
 
-  if (step.play === 'together') {
-    return cellsToTogetherFrame(cells, gridSize, step.opacity)
-  }
-
   if (step.pattern && step.accumulate) {
     return cellsToSequenceFrames(cells, gridSize, step.opacity)
+  }
+
+  if (step.play === 'together') {
+    return cellsToTogetherFrame(cells, gridSize, step.opacity)
   }
 
   if (step.pattern) {
