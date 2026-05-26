@@ -1173,19 +1173,7 @@ button:disabled {
   max-height: clamp(190px, 32vh, 300px);
   min-height: 0;
   overflow-y: auto;
-  padding-right: 2px;
-  overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
-}
-
-.paths-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-
-.paths-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255,255,255,0.12);
 }
 
 .path-chip {
