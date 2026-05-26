@@ -101,52 +101,37 @@ function getHiveGrid(gridSize: number, cellSize: number, gap: number): VisualGri
 }
 
 function getCircularGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
-  const step = cellSize + gap
-  const center = (gridSize - 1) / 2
-  const totalCells = gridSize * gridSize
+  const stepX = cellSize + gap
+  const stepY = cellSize * 0.866 + gap
   const rawCells: VisualCell[] = []
 
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
-      rawCells.push({ row, col, x: 0, y: 0, visible: false })
-    }
-  }
-
-  const ringPositions: { x: number; y: number }[] = []
-  for (let ring = 0; ringPositions.length < totalCells; ring++) {
-    const cellCount = ring === 0 ? 1 : Math.max(6, Math.round(2 * Math.PI * ring))
-    for (let i = 0; i < cellCount && ringPositions.length < totalCells; i++) {
-      const angle = (2 * Math.PI * i) / cellCount - Math.PI / 2
-      ringPositions.push({
-        x: center * step + Math.cos(angle) * ring * step,
-        y: center * step + Math.sin(angle) * ring * step,
+      const rowOffset = row % 2 === 0 ? 0 : 0.5
+      rawCells.push({
+        row,
+        col,
+        x: (col + rowOffset) * stepX,
+        y: row * stepY,
+        visible: true,
       })
     }
   }
 
-  const used = new Set<number>()
-  for (const pos of ringPositions) {
-    let bestIdx = -1
-    let bestDist = Infinity
-    for (let i = 0; i < rawCells.length; i++) {
-      if (used.has(i)) continue
-      const r = Math.floor(i / gridSize)
-      const c = i % gridSize
-      const cx = c * step + cellSize / 2
-      const cy = r * step + cellSize / 2
-      const d = Math.abs(cx - pos.x) + Math.abs(cy - pos.y)
-      if (d < bestDist) { bestDist = d; bestIdx = i }
-    }
-    if (bestIdx >= 0) {
-      used.add(bestIdx)
-      rawCells[bestIdx] = {
-        row: Math.floor(bestIdx / gridSize),
-        col: bestIdx % gridSize,
-        x: pos.x - cellSize / 2,
-        y: pos.y - cellSize / 2,
-        visible: true,
-      }
-    }
+  const minX = Math.min(...rawCells.map((c) => c.x))
+  const maxX = Math.max(...rawCells.map((c) => c.x))
+  const minY = Math.min(...rawCells.map((c) => c.y))
+  const maxY = Math.max(...rawCells.map((c) => c.y))
+
+  const cx = (minX + maxX + cellSize) / 2
+  const cy = (minY + maxY + cellSize) / 2
+  // Slightly shrink radius so no edge cells stick out
+  const radius = (Math.min(maxX - minX + cellSize, maxY - minY + cellSize) / 2) * 0.98
+
+  for (const cell of rawCells) {
+    const dx = cell.x + cellSize / 2 - cx
+    const dy = cell.y + cellSize / 2 - cy
+    cell.visible = Math.hypot(dx, dy) <= radius
   }
 
   return normalizeGrid(rawCells, cellSize, true)
