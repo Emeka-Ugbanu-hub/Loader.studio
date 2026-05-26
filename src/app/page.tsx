@@ -7,7 +7,7 @@ import PresetGrid from '@/components/PresetGrid'
 import CustomPatternEditor from '@/components/CustomPatternEditor'
 import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderSVG } from '@/lib/svgExporter'
-import { applyTrailToFrames, generateCustomFrames, getPresetColor, patternGenerators } from '@/lib/patterns'
+import { applyTrailToFrames, generateCustomFrames, getPresetColor, patternGenerators, presetToCustomPath } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 import { layoutCellShape } from '@/lib/gridLayout'
 
@@ -148,6 +148,13 @@ export default function Home() {
     setSelectedPreset(name)
     setMode('preset')
   }, [])
+
+  const handleOpenPresetInCustom = useCallback((name: string) => {
+    const path = presetToCustomPath(name, options.gridSize)
+    setCustomPath(path)
+    setCustomFrames(generateCustomFrames(path, options.gridSize))
+    setMode('custom')
+  }, [options.gridSize])
 
   const handleCustomPathChange = useCallback((path: CustomPathStep[], frames: number[][][]) => {
     setCustomPath(path)
@@ -293,6 +300,7 @@ export default function Home() {
                 options={options}
                 selected={selectedPreset}
                 onSelect={handlePresetSelect}
+                onOpenInCustom={handleOpenPresetInCustom}
               />
             ) : (
               <CustomPatternEditor

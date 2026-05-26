@@ -259,6 +259,158 @@ export function applyTrailToFrames(
   })
 }
 
+export function presetToCustomPath(name: string, gridSize: number): CustomPathStep[] {
+  const n = gridSize
+  const toStep = (p: CustomPathPoint): CustomPathStep => ({ cells: [p] })
+
+  switch (name) {
+    case 'spiral': {
+      const order: [number, number][] = []
+      let top = 0, bottom = n - 1, left = 0, right = n - 1
+      while (top <= bottom && left <= right) {
+        for (let i = left; i <= right; i++) order.push([top, i])
+        top++
+        for (let i = top; i <= bottom; i++) order.push([i, right])
+        right--
+        if (top <= bottom) { for (let i = right; i >= left; i--) order.push([bottom, i]); bottom-- }
+        if (left <= right) { for (let i = bottom; i >= top; i--) order.push([i, left]); left++ }
+      }
+      return order.map(([r, c]) => ({ cells: [{ row: r, col: c }] }))
+    }
+    case 'corners':
+      return [
+        { row: 0, col: 0 },
+        { row: 0, col: n - 1 },
+        { row: n - 1, col: 0 },
+        { row: n - 1, col: n - 1 },
+      ].map(toStep)
+    case 'plus': {
+      const mid = Math.floor(n / 2)
+      const pts: CustomPathPoint[] = []
+      for (let i = 0; i < n; i++) pts.push({ row: mid, col: i })
+      for (let i = 0; i < n; i++) if (i !== mid) pts.push({ row: i, col: mid })
+      return pts.map(toStep)
+    }
+    case 'triangle': {
+      const pts: CustomPathPoint[] = []
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c <= r; c++)
+          pts.push({ row: r, col: c })
+      return pts.map(toStep)
+    }
+    case 'wave-lr': {
+      const step: CustomPathStep = {
+        cells: [], buildAs: 'group', pattern: 'wave-lr', timing: 'sequence', play: 'one-by-one'
+      }
+      for (let c = 0; c < n; c++)
+        for (let r = 0; r < n; r++)
+          step.cells.push({ row: r, col: c })
+      return [step]
+    }
+    case 'wave-tb': {
+      const step: CustomPathStep = {
+        cells: [], buildAs: 'group', pattern: 'wave-tb', timing: 'sequence', play: 'one-by-one'
+      }
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          step.cells.push({ row: r, col: c })
+      return [step]
+    }
+    case 'wave-rl': {
+      const step: CustomPathStep = {
+        cells: [], buildAs: 'group', pattern: 'wave-rl', timing: 'sequence', play: 'one-by-one'
+      }
+      for (let c = n - 1; c >= 0; c--)
+        for (let r = 0; r < n; r++)
+          step.cells.push({ row: r, col: c })
+      return [step]
+    }
+    case 'tl-br': {
+      const pts: CustomPathPoint[] = []
+      for (let i = 0; i < n; i++) pts.push({ row: i, col: i })
+      return pts.map(toStep)
+    }
+    case 'i-left': {
+      const mid = Math.floor(n / 2)
+      const pts: CustomPathPoint[] = []
+      for (let i = 0; i < n; i++) pts.push({ row: mid, col: i })
+      return pts.map(toStep)
+    }
+    case 'left-right': {
+      const pts: CustomPathPoint[] = []
+      for (let i = 0; i < n; i++) {
+        pts.push({ row: i, col: 0 })
+        pts.push({ row: i, col: n - 1 })
+      }
+      return pts.map(toStep)
+    }
+    case 'striangle': {
+      const pts: CustomPathPoint[] = []
+      for (let c = 0; c < n; c++)
+        for (let r = 0; r <= c; r++)
+          pts.push({ row: r, col: c })
+      return pts.map(toStep)
+    }
+    case 'scorners':
+      return [
+        { row: 0, col: 0 },
+        { row: 0, col: n - 1 },
+        { row: Math.floor(n / 2), col: Math.floor(n / 2) },
+        { row: n - 1, col: 0 },
+        { row: n - 1, col: n - 1 },
+        { row: Math.floor(n / 2), col: Math.floor(n / 2) },
+      ].map(toStep)
+    case 'pulse': {
+      const step: CustomPathStep = {
+        cells: [], buildAs: 'group', pattern: 'pulse', timing: 'sequence', play: 'one-by-one'
+      }
+      const mid = Math.floor(n / 2)
+      for (let radius = 0; radius <= mid; radius++)
+        for (let r = 0; r < n; r++)
+          for (let c = 0; c < n; c++)
+            if (Math.max(Math.abs(r - mid), Math.abs(c - mid)) === radius)
+              step.cells.push({ row: r, col: c })
+      return [step]
+    }
+    case 'diagonal': {
+      const step: CustomPathStep = {
+        cells: [], buildAs: 'group', pattern: 'diagonal', timing: 'sequence', play: 'one-by-one'
+      }
+      for (let offset = -(n - 1); offset < n; offset++)
+        for (let r = 0; r < n; r++) {
+          const c = r - offset
+          if (c >= 0 && c < n) step.cells.push({ row: r, col: c })
+        }
+      return [step]
+    }
+    case 'fill': {
+      const pts: CustomPathPoint[] = []
+      for (let r = 0; r < n; r++)
+        for (let c = 0; c < n; c++)
+          pts.push({ row: r, col: c })
+      return pts.map(toStep)
+    }
+    case 'snake': {
+      const pts: CustomPathPoint[] = []
+      for (let r = 0; r < n; r++) {
+        if (r % 2 === 0) for (let c = 0; c < n; c++) pts.push({ row: r, col: c })
+        else for (let c = n - 1; c >= 0; c--) pts.push({ row: r, col: c })
+      }
+      return pts.map(toStep)
+    }
+    case 'cross': {
+      const pts: CustomPathPoint[] = []
+      for (let i = 0; i < n; i++) {
+        pts.push({ row: i, col: i })
+        pts.push({ row: i, col: n - 1 - i })
+      }
+      return pts.map(toStep)
+    }
+    default:
+      return []
+  }
+}
+
 export const patternGenerators: Record<string, (n: number) => number[][][]> = {
   spiral: (n) => {
     const order: [number, number][] = []

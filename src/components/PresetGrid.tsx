@@ -9,6 +9,7 @@ interface Props {
   options: LoaderOptions
   selected: string
   onSelect: (name: string) => void
+  onOpenInCustom: (name: string) => void
 }
 
 const PRESET_DETAILS: Record<string, { label: string; mood: string; group: 'Paths' | 'Waves' | 'Bursts' }> = {
@@ -46,11 +47,13 @@ function PresetCard({
   options,
   isActive,
   onSelect,
+  onOpenInCustom,
 }: {
   name: string
   options: LoaderOptions
   isActive: boolean
   onSelect: (name: string) => void
+  onOpenInCustom: (name: string) => void
 }) {
   const frames = useMemo(
     () => applyTrailToFrames(patternGenerators[name]?.(options.gridSize) ?? [], options.trail),
@@ -59,32 +62,40 @@ function PresetCard({
   const details = getDetails(name)
 
   return (
-    <button
-      onClick={() => onSelect(name)}
-      className={`preset-card ${isActive ? 'is-active' : ''}`}
-      aria-pressed={isActive}
-    >
-      <div className="preset-canvas">
-        <LoaderCanvas
-          options={{ ...options, color: getPresetColor(name), speed: 7 }}
-          frames={frames}
-          size={132}
-          showBgGrid
-          isActive={isActive}
-        />
-      </div>
-      <span className="preset-info">
-        <span>
-          <strong>{details.label}</strong>
-          <small>{details.mood}</small>
+    <div className={`preset-card ${isActive ? 'is-active' : ''}`}>
+      <button className="preset-card-body" onClick={() => onSelect(name)} aria-pressed={isActive}>
+        <div className="preset-canvas">
+          <LoaderCanvas
+            options={{ ...options, color: getPresetColor(name), speed: 7 }}
+            frames={frames}
+            size={132}
+            showBgGrid
+            isActive={isActive}
+          />
+        </div>
+        <span className="preset-info">
+          <span>
+            <strong>{details.label}</strong>
+            <small>{details.mood}</small>
+          </span>
+          <span className="preset-tag">{details.group}</span>
         </span>
-        <span className="preset-tag">{details.group}</span>
-      </span>
-    </button>
+      </button>
+      <button
+        className="preset-edit-btn"
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenInCustom(name)
+        }}
+        title="Open in custom builder"
+      >
+        Edit
+      </button>
+    </div>
   )
 }
 
-export default function PresetGrid({ options, selected, onSelect }: Props) {
+export default function PresetGrid({ options, selected, onSelect, onOpenInCustom }: Props) {
   const [query, setQuery] = useState('')
   const [group, setGroup] = useState<(typeof GROUPS)[number]>('All')
 
@@ -125,13 +136,14 @@ export default function PresetGrid({ options, selected, onSelect }: Props) {
 
       <div className="preset-grid">
         {filteredPresets.map((name) => (
-          <PresetCard
-            key={name}
-            name={name}
-            options={options}
-            isActive={selected === name}
-            onSelect={onSelect}
-          />
+            <PresetCard
+              key={name}
+              name={name}
+              options={options}
+              isActive={selected === name}
+              onSelect={onSelect}
+              onOpenInCustom={onOpenInCustom}
+            />
         ))}
       </div>
 
