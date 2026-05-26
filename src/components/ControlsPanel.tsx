@@ -1,6 +1,7 @@
 'use client'
 
-import type { CellShape, LoaderOptions } from '@/lib/types'
+import type { CellShape, GridLayout, LoaderOptions } from '@/lib/types'
+import InfoTip from './InfoTip'
 
 interface Props {
   options: LoaderOptions
@@ -9,8 +10,24 @@ interface Props {
 }
 
 const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
+const LAYOUTS: { key: GridLayout; label: string; note: string }[] = [
+  { key: 'matrix', label: 'Matrix', note: 'Rows and columns' },
+  { key: 'hive', label: 'Hive', note: 'Honeycomb hex layout' },
+  { key: 'circular', label: 'Circular', note: 'Round cell field' },
+  { key: 'isometric', label: 'Isometric', note: 'Angled diamond grid' },
+  { key: 'triangular', label: 'Triangular', note: 'Stacked triangle' },
+]
+
+const DEFAULT_LAYOUT_SHAPES: Partial<Record<GridLayout, CellShape>> = {
+  hive: 'hexagon',
+  circular: 'circle',
+  isometric: 'diamond',
+  triangular: 'triangle',
+}
 
 export default function ControlsPanel({ options, onChange, colorLocked = false }: Props) {
+  const activeLayout = options.layout ?? 'matrix'
+
   return (
     <div className="controls-panel">
       <div className="panel-head compact">
@@ -18,6 +35,10 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
           <p className="eyebrow">Style</p>
           <h3 className="panel-title small">Default style</h3>
         </div>
+        <InfoTip title="Default style">
+          <p>These controls set the base look for the whole loader.</p>
+          <p>Grid changes how many cells are available. Tile changes cell size. Spacing controls gaps. Speed changes playback. Glow adds light to the final preview/export.</p>
+        </InfoTip>
       </div>
 
       <div className="control-stack">
@@ -63,11 +84,36 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
         />
       </div>
 
+      <div>
+        <div className="control-label">Layout</div>
+        <select
+          className="layout-select"
+          value={activeLayout}
+          onChange={(e) => {
+            const key = e.target.value as GridLayout
+            onChange({
+              layout: key,
+              ...(DEFAULT_LAYOUT_SHAPES[key] ? { shape: DEFAULT_LAYOUT_SHAPES[key] } : {}),
+            })
+          }}
+        >
+          {LAYOUTS.map((layout) => (
+            <option key={layout.key} value={layout.key}>
+              {layout.label} — {layout.note}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="control-row">
         <div>
           <span className="control-label">Trail</span>
           <p className="control-note">Fade recent motion behind the active cells</p>
         </div>
+        <InfoTip title="Trail">
+          <p>Trail leaves a short fade behind moving cells so motion feels smoother.</p>
+          <p>In presets this applies globally. In Custom Builder, use Selected style to apply trail to only selected cells or paths.</p>
+        </InfoTip>
         <button
           type="button"
           onClick={() => onChange({ trail: !options.trail })}
@@ -84,6 +130,10 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
           <label className="control-label" htmlFor="loader-color">Accent</label>
           <p className="control-note">{colorLocked ? 'Presets choose their own color' : options.color}</p>
         </div>
+        <InfoTip title="Accent">
+          <p>Accent is the default color for custom loaders.</p>
+          <p>Preset colors are locked so each preset keeps its designed look.</p>
+        </InfoTip>
         <input
           id="loader-color"
           type="color"
@@ -96,7 +146,13 @@ export default function ControlsPanel({ options, onChange, colorLocked = false }
       </div>
 
       <div>
-        <div className="control-label mb-2">Shape</div>
+        <div className="section-title-row mb-2">
+          <div className="control-label">Shape</div>
+          <InfoTip title="Shape">
+            <p>Shape controls the default tile form. Layout controls where tiles are placed.</p>
+            <p>Shortcuts: use the Layout buttons for structure first, then use Shape or Selected style for cell-level changes.</p>
+          </InfoTip>
+        </div>
         <div className="shape-grid">
           {SHAPES.map((shape) => (
             <button
