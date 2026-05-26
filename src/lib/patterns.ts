@@ -107,10 +107,6 @@ function layerToFrames(step: CustomPathStep, gridSize: number): number[][][] {
       : cellsToSequenceFrames(cells, gridSize, step.opacity)
   }
 
-  if (step.pattern && step.accumulate) {
-    return cellsToSequenceFrames(cells, gridSize, step.opacity)
-  }
-
   if (step.play === 'together') {
     return cellsToTogetherFrame(cells, gridSize, step.opacity)
   }
@@ -212,7 +208,16 @@ function pointToStep(p: CustomPathPoint): CustomPathStep {
 
 export function generateCustomFrames(path: CustomPathStep[], gridSize: number): number[][][] {
   if (path.length === 0) return [emptyGrid(gridSize)]
-  return pathToFrames(path, gridSize)
+  const expanded = path.flatMap((step) => {
+    if (!step.accumulate || step.cells.length <= 1) return [step]
+    return step.cells.map((c) => ({
+      cells: [{ ...c }],
+      buildAs: 'singles' as const,
+      play: 'one-by-one' as const,
+      timing: 'sequence' as const,
+    }))
+  })
+  return pathToFrames(expanded, gridSize)
 }
 
 function motionFrame(frames: number[][][], frameIndex: number): number[][] {
