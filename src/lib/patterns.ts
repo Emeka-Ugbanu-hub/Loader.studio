@@ -288,7 +288,7 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
   const n = gridSize
   function step(pts: CustomPathPoint[]): CustomPathStep[] {
     if (pts.length === 0) return []
-    return [{ cells: pts, buildAs: 'singles', play: 'one-by-one', timing: 'sequence' }]
+    return [{ cells: pts, buildAs: 'singles', play: 'one-by-one', timing: 'sequence', accumulate: true }]
   }
 
   switch (name) {
@@ -328,7 +328,7 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
     }
     case 'wave-lr': {
       const step: CustomPathStep = {
-        cells: [], buildAs: 'group', pattern: 'wave-lr', timing: 'sequence', play: 'one-by-one'
+        cells: [], buildAs: 'group', pattern: 'wave-lr', timing: 'sequence', play: 'one-by-one', accumulate: true
       }
       for (let c = 0; c < n; c++)
         for (let r = 0; r < n; r++)
