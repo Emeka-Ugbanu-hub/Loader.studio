@@ -101,28 +101,28 @@ function getHiveGrid(gridSize: number, cellSize: number, gap: number): VisualGri
 }
 
 function getCircularGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
-  const stepX = cellSize + gap
-  const stepY = cellSize * 0.86 + gap
+  const step = cellSize + gap
   const center = (gridSize - 1) / 2
   const radius = gridSize / 2
   const rawCells: VisualCell[] = []
 
   for (let row = 0; row < gridSize; row++) {
     for (let col = 0; col < gridSize; col++) {
-      const rowOffset = row % 2 === 0 ? 0 : 0.5
-      const dx = col + rowOffset - center
+      const dx = col - center
       const dy = row - center
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const visible = dist <= radius + 0.3
       rawCells.push({
         row,
         col,
-        x: (col + rowOffset) * stepX,
-        y: row * stepY,
-        visible: Math.hypot(dx, dy * 0.95) <= radius,
+        x: col * step,
+        y: row * step,
+        visible,
       })
     }
   }
 
-  return normalizeGrid(rawCells, cellSize)
+  return normalizeGrid(rawCells, cellSize, true)
 }
 
 function getIsometricGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
