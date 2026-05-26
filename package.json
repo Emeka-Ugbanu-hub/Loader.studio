@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "deploy": "rm -rf out && NEXT_PUBLIC_BASE_PATH=/Loader.studio next build && cp .nojekyll out/.nojekyll 2>/dev/null; touch out/.nojekyll && npx gh-pages -d out -a && git push origin gh-pages",
+    "deploy": "rm -rf out && NEXT_PUBLIC_BASE_PATH=/Loader.studio next build && touch out/.nojekyll && npx gh-pages -d out",
     "start": "next start",
     "lint": "eslint"
   },
