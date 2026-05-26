@@ -494,7 +494,7 @@ export function presetToCustomPath(name: string, gridSize: number): CustomPathSt
         return seed / 0x7fffffff
       }
       for (let i = pts.length - 1; i > 0; i--) {
-        const j = Math.floor(next() * (i + 1));
+      const j = Math.floor(next() * (i + 1));
         [pts[i], pts[j]] = [pts[j], pts[i]]
       }
       return step(pts)
