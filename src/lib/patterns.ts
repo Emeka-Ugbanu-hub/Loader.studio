@@ -91,6 +91,18 @@ function cellsToSequenceFrames(cells: CustomPathPoint[], gridSize: number, stepF
   return frames.length > 0 ? frames : [emptyGrid(gridSize)]
 }
 
+function cellsToSequenceFramesNoAccumulate(cells: CustomPathPoint[], gridSize: number, stepFallback?: number): number[][][] {
+  const frames: number[][][] = []
+
+  for (const c of cells) {
+    const frame = emptyGrid(gridSize)
+    frame[c.row][c.col] = cellAlpha(c, stepFallback)
+    frames.push(frame)
+  }
+
+  return frames.length > 0 ? frames : [emptyGrid(gridSize)]
+}
+
 function cellsToTogetherFrame(cells: CustomPathPoint[], gridSize: number, stepFallback?: number): number[][][] {
   const frame = emptyGrid(gridSize)
   for (const c of cells) frame[c.row][c.col] = cellAlpha(c, stepFallback)
@@ -102,8 +114,11 @@ function layerToFrames(step: CustomPathStep, gridSize: number): number[][][] {
   if (cells.length === 0) return [emptyGrid(gridSize)]
 
   if (step.buildAs === 'singles') {
-    return step.play === 'together'
-      ? cellsToTogetherFrame(cells, gridSize, step.opacity)
+    if (step.play === 'together') {
+      return cellsToTogetherFrame(cells, gridSize, step.opacity)
+    }
+    return step.accumulate === false
+      ? cellsToSequenceFramesNoAccumulate(cells, gridSize, step.opacity)
       : cellsToSequenceFrames(cells, gridSize, step.opacity)
   }
 
@@ -244,6 +259,7 @@ export function applyTrailToFrames(
 ): number[][][] {
   const trailSet = trail instanceof Set ? trail : null
   if (!trailSet && !trail) return frames
+  if (trailSet && trailSet.size === 0) return frames
   if (frames.length <= 1) return frames
 
   const trailLength = Math.min(5, Math.max(2, Math.ceil(frames.length / 4)))

@@ -1,6 +1,13 @@
 import type { CellShape } from './types'
 
-export function drawCellShape(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, shape: CellShape) {
+export function drawCellShape(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  shape: CellShape,
+  orientation: 'up' | 'down' = 'up',
+) {
   const h = size / 2
   switch (shape) {
     case 'square':
@@ -22,9 +29,15 @@ export function drawCellShape(ctx: CanvasRenderingContext2D, x: number, y: numbe
       break
     case 'triangle':
       ctx.beginPath()
-      ctx.moveTo(x + h, y)
-      ctx.lineTo(x + size, y + size)
-      ctx.lineTo(x, y + size)
+      if (orientation === 'down') {
+        ctx.moveTo(x, y)
+        ctx.lineTo(x + size, y)
+        ctx.lineTo(x + h, y + size)
+      } else {
+        ctx.moveTo(x + h, y)
+        ctx.lineTo(x + size, y + size)
+        ctx.lineTo(x, y + size)
+      }
       ctx.closePath()
       ctx.fill()
       break
