@@ -23,11 +23,7 @@ export function getCellMap(grid: VisualGrid) {
   return new Map(grid.cells.map((cell) => [visualCellKey(cell.row, cell.col), cell]))
 }
 
-export function layoutCellShape(layout: GridLayout, shape: CellShape): CellShape {
-  if (layout === 'hive') return 'hexagon'
-  if (layout === 'circular') return 'circle'
-  if (layout === 'isometric') return 'diamond'
-  if (layout === 'triangular') return 'triangle'
+export function layoutCellShape(_layout: GridLayout, shape: CellShape): CellShape {
   return shape
 }
 
@@ -102,27 +98,38 @@ function getHiveGrid(gridSize: number, cellSize: number, gap: number): VisualGri
 
 function getCircularGrid(gridSize: number, cellSize: number, gap: number): VisualGrid {
   const spacing = cellSize + gap
+  const targetCount = Math.min(gridSize * gridSize, Math.max(7, Math.round(gridSize * gridSize * 0.42)))
   const positions: { x: number; y: number }[] = []
 
-  // Center cell
   positions.push({ x: 0, y: 0 })
 
-  // Concentric rings — each ring n has radius n*spacing and ~2πn cells
   let ring = 1
-  while (positions.length < gridSize * gridSize) {
+  while (positions.length < targetCount) {
     const radius = ring * spacing
-    const cellCount = Math.max(6, Math.round(2 * Math.PI * ring))
-    const remaining = gridSize * gridSize - positions.length
-    const count = Math.min(cellCount, remaining)
+    const ringCount = Math.max(6, Math.round(2 * Math.PI * ring))
+    if (positions.length + ringCount > targetCount) break
 
-    for (let i = 0; i < count; i++) {
-      const angle = (2 * Math.PI * i) / count - Math.PI / 2
+    for (let i = 0; i < ringCount; i++) {
+      const angle = (2 * Math.PI * i) / ringCount - Math.PI / 2
       positions.push({
         x: Math.cos(angle) * radius,
         y: Math.sin(angle) * radius,
       })
     }
+
     ring++
+  }
+
+  const remaining = targetCount - positions.length
+  if (remaining >= 6) {
+    const radius = ring * spacing
+    for (let i = 0; i < remaining; i++) {
+      const angle = (2 * Math.PI * i) / remaining - Math.PI / 2
+      positions.push({
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+      })
+    }
   }
 
   const rawCells: VisualCell[] = []
@@ -133,9 +140,9 @@ function getCircularGrid(gridSize: number, cellSize: number, gap: number): Visua
     rawCells.push({
       row: r,
       col: c,
-      x: p.x - cellSize / 2,
-      y: p.y - cellSize / 2,
-      visible: true,
+      x: (p?.x ?? 0) - cellSize / 2,
+      y: (p?.y ?? 0) - cellSize / 2,
+      visible: Boolean(p),
     })
   }
 

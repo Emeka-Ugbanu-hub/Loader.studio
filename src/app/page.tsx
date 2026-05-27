@@ -1,26 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import LoaderCanvas from '@/components/LoaderCanvas'
 import ControlsPanel from '@/components/ControlsPanel'
 import PresetGrid from '@/components/PresetGrid'
 import CustomPatternEditor from '@/components/CustomPatternEditor'
 import BrandLogo from '@/components/BrandLogo'
+import { generateLoaderHTML, generateLoaderReact } from '@/lib/codeExporter'
 import { generateLoaderSVG } from '@/lib/svgExporter'
 import { applyTrailToFrames, generateCustomFrames, patternGenerators, presetToCustomPath } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 import { DEFAULT_OPTIONS } from '@/lib/types'
 import { layoutCellShape } from '@/lib/gridLayout'
-
-const DRAFT_KEY = 'loader-studio:draft:v1'
-
-interface DraftData {
-  options: LoaderOptions
-  mode: 'preset' | 'custom'
-  selectedPreset: string
-  customPath: CustomPathStep[]
-  hiddenCells: string[]
-}
+import { useLoaderDraft } from '@/lib/useLoaderDraft'
 
 function emptyFrame(size: number) {
   return Array.from({ length: size }, () => Array(size).fill(0))
@@ -33,58 +25,12 @@ export default function Home() {
   const [customPath, setCustomPath] = useState<CustomPathStep[]>([])
   const [customFrames, setCustomFrames] = useState<number[][][]>([])
   const [hiddenCells, setHiddenCells] = useState<string[]>([])
-  const [copied, setCopied] = useState(false)
-  const [draftStatus, setDraftStatus] = useState<'idle' | 'saved' | 'restored'>('idle')
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const [copied, setCopied] = useState<'svg' | 'html' | 'react' | null>(null)
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY)
-      if (!raw) return
-      const draft: DraftData = JSON.parse(raw)
-      const draftOptions = draft.options ? { ...DEFAULT_OPTIONS, ...draft.options } : undefined
-      /* eslint-disable react-hooks/set-state-in-effect */
-      if (draftOptions) setOptions(draftOptions)
-      if (draft.mode) setMode(draft.mode)
-      if (draft.selectedPreset) setSelectedPreset(draft.selectedPreset)
-      if (draft.customPath) {
-        setCustomPath(draft.customPath)
-        setCustomFrames(generateCustomFrames(draft.customPath, draftOptions?.gridSize ?? DEFAULT_OPTIONS.gridSize))
-      }
-      if (draft.hiddenCells) setHiddenCells(draft.hiddenCells)
-      /* eslint-enable react-hooks/set-state-in-effect */
-      setTimeout(() => setDraftStatus('restored'), 0)
-    } catch {
-      // ignore corrupted drafts
-    }
-  }, [])
-
-  const restoredRef = useRef(false)
-  useEffect(() => {
-    if (draftStatus === 'restored' && !restoredRef.current) {
-      restoredRef.current = true
-      const timer = setTimeout(() => setDraftStatus('idle'), 100)
-      return () => clearTimeout(timer)
-    }
-  }, [draftStatus])
-
-  useEffect(() => {
-    if (draftStatus === 'restored') return
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      const draft: DraftData = { options, mode, selectedPreset, customPath, hiddenCells }
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-        setDraftStatus('saved')
-      } catch {
-        // quota exceeded or storage unavailable
-      }
-    }, 600)
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options, mode, selectedPreset, customPath, hiddenCells])
+  const draftStatus = useLoaderDraft(
+    options, mode, selectedPreset, customPath, hiddenCells,
+    setOptions, setMode, setSelectedPreset, setCustomPath, setCustomFrames, setHiddenCells,
+  )
 
   const presetFrames = useMemo(
     () => patternGenerators[selectedPreset]?.(options.gridSize) ?? [],
@@ -154,11 +100,17 @@ export default function Home() {
     setHiddenCells(hidden)
   }, [])
 
-  const handleCopySVG = useCallback(() => {
-    const svg = generateLoaderSVG(displayOptions, trailedFrames, mode === 'custom' ? customPath : undefined, hiddenCells)
-    navigator.clipboard.writeText(svg).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+  const copyToClipboard = useCallback((format: 'svg' | 'html' | 'react') => {
+    const path = mode === 'custom' ? customPath : undefined
+    const code = format === 'svg'
+      ? generateLoaderSVG(displayOptions, trailedFrames, path, hiddenCells)
+      : format === 'html'
+        ? generateLoaderHTML(displayOptions, trailedFrames, path, hiddenCells)
+        : generateLoaderReact(displayOptions, trailedFrames, path, hiddenCells)
+
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(format)
+      setTimeout(() => setCopied(null), 2000)
     })
   }, [displayOptions, trailedFrames, mode, customPath, hiddenCells])
 
@@ -238,18 +190,26 @@ export default function Home() {
           </div>
 
           <div className="export-actions">
-            <button onClick={handleCopySVG} className="primary-action">
-              {copied ? 'SVG copied' : 'Copy SVG'}
+            <button onClick={() => copyToClipboard('svg')} className="primary-action">
+              {copied === 'svg' ? 'SVG copied' : 'Copy SVG'}
+            </button>
+            <button onClick={() => copyToClipboard('html')} className="primary-action">
+              {copied === 'html' ? 'HTML copied' : 'Copy HTML/CSS'}
+            </button>
+            <button onClick={() => copyToClipboard('react')} className="primary-action">
+              {copied === 'react' ? 'React copied' : 'Copy React'}
             </button>
             <button onClick={handleDownloadSVG} className="primary-action">
-              Download
+              Download SVG
             </button>
           </div>
 
-          <ControlsPanel
-            options={options}
-            onChange={handleOptionsChange}
-          />
+          <div className="desktop-controls">
+            <ControlsPanel
+              options={options}
+              onChange={handleOptionsChange}
+            />
+          </div>
         </aside>
 
         <section className="studio-panel studio-builder-panel min-w-0 overflow-hidden">
@@ -280,6 +240,13 @@ export default function Home() {
                 Custom builder
               </button>
             </div>
+          </div>
+
+          <div className="mobile-controls-panel px-3 pt-3 sm:px-5">
+            <ControlsPanel
+              options={options}
+              onChange={handleOptionsChange}
+            />
           </div>
 
           <div className="px-3 pb-3 sm:px-5 sm:pb-5">

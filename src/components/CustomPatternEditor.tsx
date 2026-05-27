@@ -46,6 +46,7 @@ const MOTION_OPTIONS: { value: MotionMode; label: string }[] = [
 ]
 
 const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
+const MIN_EDITOR_CELL_SIZE = 28
 
 function getMotionMode(step?: CustomPathStep): MotionMode {
   if (step?.play === 'together') return 'together'
@@ -305,15 +306,21 @@ export default function CustomPatternEditor({
     return { colors, shapes, glows, sizes }
   }, [path])
 
-  const editorCellSize = getDisplayCellSize(options.gridSize, options.cellSize, 440)
+  const editorCellSize = Math.max(
+    MIN_EDITOR_CELL_SIZE,
+    getDisplayCellSize(options.gridSize, options.cellSize, 440)
+  )
   const visualGrid = useMemo(
     () => getVisualGrid(options.layout ?? 'matrix', options.gridSize, editorCellSize, options.gap),
     [editorCellSize, options.gap, options.gridSize, options.layout]
   )
   const visualCellMap = useMemo(() => getCellMap(visualGrid), [visualGrid])
   const usesFreeformLayout = (options.layout ?? 'matrix') !== 'matrix'
+  const fitScale = Math.min(1, 420 / Math.max(visualGrid.width, visualGrid.height))
+  const gridScale = Math.max(0.7, fitScale)
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
+  const activeCellCount = activePath ? getStepCells(activePath).length : 0
   const showCreateGroup = selectedCount >= 2
   const activeMotionOptions = activeIsGroup
     ? MOTION_OPTIONS
@@ -433,62 +440,69 @@ export default function CustomPatternEditor({
 
       <div className="builder-layout">
         <div className="builder-canvas-wrap">
-
           <div
-            className={`custom-grid layout-${options.layout ?? 'matrix'}-grid ${usesFreeformLayout ? 'is-freeform' : ''} ${options.gap === 0 ? 'is-gapless' : ''}`}
-            style={usesFreeformLayout
-              ? {
+            className="custom-grid-stage"
+            style={{
+              width: visualGrid.width * gridScale,
+              height: visualGrid.height * gridScale,
+            }}
+          >
+            <div
+              className={`custom-grid layout-${options.layout ?? 'matrix'}-grid ${usesFreeformLayout ? 'is-freeform' : ''} ${options.gap === 0 ? 'is-gapless' : ''}`}
+              style={{
                 width: visualGrid.width,
                 height: visualGrid.height,
-              }
-              : {
-                gridTemplateColumns: `repeat(${options.gridSize}, ${editorCellSize}px)`,
-                gap: options.gap,
+                transform: `scale(${gridScale})`,
               }}
-          >
-            {Array.from({ length: options.gridSize }, (_, row) =>
-              Array.from({ length: options.gridSize }, (_, col) => {
-                const key = k(row, col)
-                const visualCell = visualCellMap.get(key)
-                if (!visualCell?.visible) return null
-                const hidden = hiddenSet.has(key)
-                const placement = cellToPlacement.get(key)
-                const isSelected = selectedSet.has(key)
-                const isActivePath = placement?.pathIndex === safeActivePathIndex
-                const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
-                const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
-                const cellColor = cellProps.colors.get(key) ?? options.color
-                const cellGlow = cellProps.glows.get(key) ?? options.glow
-                const cellShape = cellProps.shapes.get(key) ?? options.shape
-                const cellSize = cellProps.sizes.get(key) ?? 1
-                const customColor = cellProps.colors.has(key)
+            >
+              {Array.from({ length: options.gridSize }, (_, row) =>
+                Array.from({ length: options.gridSize }, (_, col) => {
+                  const key = k(row, col)
+                  const visualCell = visualCellMap.get(key)
+                  if (!visualCell?.visible) return null
+                  const hidden = hiddenSet.has(key)
+                  const placement = cellToPlacement.get(key)
+                  const isSelected = selectedSet.has(key)
+                  const isActivePath = placement?.pathIndex === safeActivePathIndex
+                  const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
+                  const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
+                  const cellColor = cellProps.colors.get(key) ?? options.color
+                  const cellGlow = cellProps.glows.get(key) ?? options.glow
+                  const cellShape = cellProps.shapes.get(key) ?? layoutCellShape(options.layout ?? 'matrix', options.shape)
+                  const cellSize = cellProps.sizes.get(key) ?? 1
+                  const customColor = cellProps.colors.has(key)
+                  const editorGlow = Math.min(cellGlow, 6)
 
-                return (
-                  <button
-                    key={key}
-                    onClick={(e) => handleCellClick(row, col, e.shiftKey)}
-                    onContextMenu={(event) => {
-                      event.preventDefault()
-                      toggleHiddenCell(row, col)
-                    }}
-                    className={`builder-cell tile-${cellShape} ${cellShape === 'triangle' && visualCell.orientation === 'down' ? 'tile-triangle-down' : ''} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
-                    style={{
-                      width: editorCellSize,
-                      height: editorCellSize,
-                      transform: cellSize !== 1 ? `scale(${cellSize})` : undefined,
-                      ...(!isSelected && cellGlow > 0 ? { boxShadow: `0 0 ${cellGlow / 2}px ${cellGlow * 2}px ${cellColor}40` } : {}),
-                    }}
-                    aria-label={`Cell row ${row + 1}, column ${col + 1}`}
-                  >
-                    {hidden ? (
-                      <span className="cell-mask" />
-                    ) : placement ? (
-                      <span className="cell-index" style={customColor ? { background: cellColor, color: '#030303' } : undefined}>{placement.cellIndex + 1}</span>
-                    ) : null}
-                  </button>
-                )
-              })
-            )}
+                  return (
+                    <button
+                      key={key}
+                      onClick={(e) => handleCellClick(row, col, e.shiftKey)}
+                      onContextMenu={(event) => {
+                        event.preventDefault()
+                        toggleHiddenCell(row, col)
+                      }}
+                      className={`builder-cell tile-${cellShape} ${cellShape === 'triangle' && visualCell.orientation === 'down' ? 'tile-triangle-down' : ''} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                      style={{
+                        width: editorCellSize,
+                        height: editorCellSize,
+                        position: 'absolute',
+                        left: visualCell.x,
+                        top: visualCell.y,
+                        transform: cellSize !== 1 ? `scale(${cellSize})` : undefined,
+                        ...(!isSelected && editorGlow > 0 ? { boxShadow: `0 0 ${editorGlow / 2}px ${editorGlow}px ${cellColor}18` } : {}),
+                      }}
+                      aria-label={`Cell row ${row + 1}, column ${col + 1}`}
+                    >
+                      {hidden ? (
+                        <span className="cell-mask" />
+                      ) : placement ? (
+                        <span className="cell-index" style={customColor ? { background: cellColor, color: '#030303' } : undefined}>{placement.cellIndex + 1}</span>
+                      ) : null}
+                    </button>
+                  )
+                })
+              )}
+            </div>
           </div>
 
           <p className="grid-hint">Click empty cells to build. Click numbered cells to edit.</p>
@@ -521,11 +535,11 @@ export default function CustomPatternEditor({
                   onClick={() => {
                     updatePath(path.map((step, i) => (
                       i === safeActivePathIndex
-                        ? { ...step, accumulate: !step.accumulate }
+                        ? { ...step, accumulate: step.accumulate === false ? true : false }
                         : step
                     )))
                   }}
-                  className={`toggle-switch ${activePath.accumulate ? 'is-active' : ''}`}
+                  className={`toggle-switch ${activePath.accumulate !== false ? 'is-active' : ''}`}
                 >
                   <span />
                 </button>
@@ -673,7 +687,7 @@ export default function CustomPatternEditor({
             )}
           </section>
 
-          {activePath && activeIsGroup && (
+          {activePath && activeCellCount > 1 && (
             <section>
               <div className="inspector-row">
                 <p className="inspector-label">Motion</p>

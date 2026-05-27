@@ -21,6 +21,49 @@ export function generateLoaderSVG(
   const cellGlows = props.glows
   const cellSizes = props.sizes
 
+  const makeShape = (
+    key: string,
+    x: number,
+    y: number,
+    opacity: string,
+    withAnimation?: string
+  ) => {
+    const visualCell = cellMap.get(key)
+    if (!visualCell?.visible) return ''
+    const glow = cellGlows.get(key) ?? defaultGlow
+    const fillColor = cellColors.get(key) ?? defaultColor
+    const shape = cellShapes.get(key) ?? defaultShape
+    const size = cellSizes.get(key) ?? 1
+    const h = cellSize / 2
+    const cx = x + h
+    const cy = y + h
+    const filter = glow > 0 ? ` filter="url(#glow-${glow})"` : ''
+    const animatedContent = withAnimation ?? ''
+    const gOpen = size !== 1 ? `<g transform="translate(${cx} ${cy}) scale(${size}) translate(${-cx} ${-cy})">` : ''
+    const gClose = size !== 1 ? '</g>' : ''
+
+    switch (shape) {
+      case 'circle':
+        return `${gOpen}<circle cx="${x + h}" cy="${y + h}" r="${h}" fill="${fillColor}" opacity="${opacity}"${filter}>${animatedContent}</circle>${gClose}`
+      case 'diamond':
+        return `${gOpen}<polygon points="${x + h},${y} ${x + cellSize},${y + h} ${x + h},${y + cellSize} ${x},${y + h}" fill="${fillColor}" opacity="${opacity}"${filter}>${animatedContent}</polygon>${gClose}`
+      case 'triangle':
+        return visualCell.orientation === 'down'
+          ? `${gOpen}<polygon points="${x},${y} ${x + cellSize},${y} ${x + h},${y + cellSize}" fill="${fillColor}" opacity="${opacity}"${filter}>${animatedContent}</polygon>${gClose}`
+          : `${gOpen}<polygon points="${x + h},${y} ${x + cellSize},${y + cellSize} ${x},${y + cellSize}" fill="${fillColor}" opacity="${opacity}"${filter}>${animatedContent}</polygon>${gClose}`
+      case 'hexagon': {
+        const hex: string[] = []
+        for (let i = 0; i < 6; i++) {
+          const a = (Math.PI / 3) * i - Math.PI / 6
+          hex.push(`${(x + h + h * Math.cos(a)).toFixed(1)},${(y + h + h * Math.sin(a)).toFixed(1)}`)
+        }
+        return `${gOpen}<polygon points="${hex.join(' ')}" fill="${fillColor}" opacity="${opacity}"${filter}>${animatedContent}</polygon>${gClose}`
+      }
+      default:
+        return `${gOpen}<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${fillColor}" opacity="${opacity}"${filter}>${animatedContent}</rect>${gClose}`
+    }
+  }
+
   const cellFrames: Map<string, number[]> = new Map()
   for (let f = 0; f < frames.length; f++) {
     for (let r = 0; r < gridSize; r++) {
@@ -68,66 +111,34 @@ export function generateLoaderSVG(
     </filter>`
   }
 
+  let backgroundShapes = ''
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      const key = cellKey(r, c)
+      const visualCell = cellMap.get(key)
+      if (!visualCell?.visible || hiddenSet.has(key)) continue
+      backgroundShapes += `\n    ${makeShape(key, visualCell.x, visualCell.y, '0.08').replace(/fill="[^"]+"/, 'fill="#ffffff"')}`
+    }
+  }
+
   let shapes = ''
   for (const cell of animatedCells) {
     const visualCell = cellMap.get(cell.key)
     if (!visualCell?.visible) continue
     const x = visualCell.x
     const y = visualCell.y
-    const glow = cellGlows.get(cell.key) ?? defaultGlow
-    const fillColor = cellColors.get(cell.key) ?? defaultColor
-    const shape = cellShapes.get(cell.key) ?? defaultShape
-    const size = cellSizes.get(cell.key) ?? 1
     const values = cell.values.join(';')
-    const h = cellSize / 2
-    const cx = x + h
-    const cy = y + h
-
-    const gOpen = size !== 1 ? `<g transform="translate(${cx} ${cy}) scale(${size}) translate(${-cx} ${-cy})">` : ''
-    const gClose = size !== 1 ? '</g>' : ''
-    let shapeStr: string
-    switch (shape) {
-      case 'circle':
-        shapeStr = `${gOpen}<circle cx="${x + h}" cy="${y + h}" r="${h}" fill="${fillColor}"${glow > 0 ? ` filter="url(#glow-${glow})"` : ''}>
-        <animate attributeName="opacity" values="${values}" dur="${dur}s" repeatCount="indefinite"/>
-      </circle>${gClose}`
-        break
-      case 'diamond':
-        shapeStr = `${gOpen}<polygon points="${x + h},${y} ${x + cellSize},${y + h} ${x + h},${y + cellSize} ${x},${y + h}" fill="${fillColor}"${glow > 0 ? ` filter="url(#glow-${glow})"` : ''}>
-        <animate attributeName="opacity" values="${values}" dur="${dur}s" repeatCount="indefinite"/>
-      </polygon>${gClose}`
-        break
-      case 'triangle':
-        shapeStr = visualCell.orientation === 'down'
-          ? `${gOpen}<polygon points="${x},${y} ${x + cellSize},${y} ${x + h},${y + cellSize}" fill="${fillColor}"${glow > 0 ? ` filter="url(#glow-${glow})"` : ''}>
-        <animate attributeName="opacity" values="${values}" dur="${dur}s" repeatCount="indefinite"/>
-      </polygon>${gClose}`
-          : `${gOpen}<polygon points="${x + h},${y} ${x + cellSize},${y + cellSize} ${x},${y + cellSize}" fill="${fillColor}"${glow > 0 ? ` filter="url(#glow-${glow})"` : ''}>
-        <animate attributeName="opacity" values="${values}" dur="${dur}s" repeatCount="indefinite"/>
-      </polygon>${gClose}`
-        break
-      case 'hexagon': {
-        const hex: string[] = []
-        for (let i = 0; i < 6; i++) {
-          const a = (Math.PI / 3) * i - Math.PI / 6
-          hex.push(`${(x + h + h * Math.cos(a)).toFixed(1)},${(y + h + h * Math.sin(a)).toFixed(1)}`)
-        }
-        shapeStr = `${gOpen}<polygon points="${hex.join(' ')}" fill="${fillColor}"${glow > 0 ? ` filter="url(#glow-${glow})"` : ''}>
-        <animate attributeName="opacity" values="${values}" dur="${dur}s" repeatCount="indefinite"/>
-      </polygon>${gClose}`
-        break
-      }
-      default:
-        shapeStr = `${gOpen}<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${fillColor}"${glow > 0 ? ` filter="url(#glow-${glow})"` : ''}>
-        <animate attributeName="opacity" values="${values}" dur="${dur}s" repeatCount="indefinite"/>
-      </rect>${gClose}`
-    }
-    shapes += `\n    ${shapeStr}`
+    const fallbackOpacity = Math.max(...cell.values).toFixed(3).replace(/\.?0+$/, '')
+    shapes += `\n    ${makeShape(cell.key, x, y, fallbackOpacity, `<animate attributeName="opacity" values="${values}" dur="${dur}s" begin="0s" repeatCount="indefinite"/>`)}`
   }
 
   return `<svg viewBox="0 0 ${visualGrid.width} ${visualGrid.height}" width="${visualGrid.width}" height="${visualGrid.height}" xmlns="http://www.w3.org/2000/svg">
   ${defs ? `<defs>${defs}
   </defs>` : ''}
-  <rect width="100%" height="100%" fill="transparent"/>${shapes}
+  <rect width="100%" height="100%" fill="transparent"/>
+  <g class="loader-background">${backgroundShapes}
+  </g>
+  <g class="loader-animation">${shapes}
+  </g>
 </svg>`
 }
