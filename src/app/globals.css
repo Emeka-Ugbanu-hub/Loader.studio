@@ -1842,7 +1842,26 @@ button:disabled {
   }
 
   .path-chip-actions button {
-    padding-inline: 8px;
+    padding-inline: 10px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+
+  .timing-row {
+    min-height: 36px;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .builder-cell {
+    min-width: 28px;
+    min-height: 28px;
+  }
+
+  .scope-button {
+    min-height: 34px;
+    font-size: 12px;
+    padding: 5px 12px;
   }
 
   .path-actions {

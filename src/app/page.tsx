@@ -11,8 +11,9 @@ import { generateLoaderSVG } from '@/lib/svgExporter'
 import { applyTrailToFrames, generateCustomFrames, patternGenerators, presetToCustomPath } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 import { DEFAULT_OPTIONS } from '@/lib/types'
-import { layoutCellShape } from '@/lib/gridLayout'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useLoaderDraft } from '@/lib/useLoaderDraft'
+import { layoutCellShape } from '@/lib/gridLayout'
 
 function emptyFrame(size: number) {
   return Array.from({ length: size }, () => Array(size).fill(0))
@@ -126,6 +127,7 @@ export default function Home() {
   }, [displayOptions, trailedFrames, mode, customPath, hiddenCells])
 
   return (
+    <ErrorBoundary>
     <div className="studio-shell min-h-screen text-neutral-100">
       <header className="studio-topbar sticky top-0 z-40">
         <div className="mx-auto flex h-16 w-full max-w-[1520px] items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -271,5 +273,6 @@ export default function Home() {
         </section>
       </main>
     </div>
+    </ErrorBoundary>
   )
 }
