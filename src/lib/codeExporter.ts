@@ -142,6 +142,10 @@ function keyframesForCell(className: string, values: number[]) {
   return `@keyframes ${className} {\n${stops.join('\n')}\n}`
 }
 
+function valuesKey(values: number[]): string {
+  return values.map((v) => Number(v.toFixed(3))).join(',')
+}
+
 function buildCss(options: LoaderOptions, frames: number[][][], cells: ExportCell[], width: number, height: number) {
   const duration = `${(frames.length / options.speed).toFixed(3).replace(/\.?0+$/, '')}s`
   const baseCss = `.loader-studio-loader {
@@ -167,14 +171,30 @@ function buildCss(options: LoaderOptions, frames: number[][][], cells: ExportCel
   animation-iteration-count: infinite;
 }`
 
-  const cellCss = cells.map((cell) => `.${cell.className} {
+  const keyframeGroups = new Map<string, { name: string; values: number[] }>()
+  let keyframeIdx = 0
+  for (const cell of cells) {
+    const k = valuesKey(cell.values)
+    if (!keyframeGroups.has(k)) {
+      keyframeGroups.set(k, { name: `ls-kf-${keyframeIdx}`, values: cell.values })
+      keyframeIdx++
+    }
+  }
+
+  const keyframeCss = Array.from(keyframeGroups.values())
+    .map((group) => keyframesForCell(group.name, group.values))
+    .join('\n\n')
+
+  const cellCss = cells.map((cell) => {
+    const k = valuesKey(cell.values)
+    const name = keyframeGroups.get(k)!.name
+    return `.${cell.className} {
   ${cell.inlineStyle}
-  animation-name: ${cell.className};
-}
+  animation-name: ${name};
+}`
+  }).join('\n\n')
 
-${keyframesForCell(cell.className, cell.values)}`).join('\n\n')
-
-  return `${baseCss}\n\n${cellCss}`
+  return `${baseCss}\n\n${keyframeCss}\n\n${cellCss}`
 }
 
 export function generateLoaderHTML(
