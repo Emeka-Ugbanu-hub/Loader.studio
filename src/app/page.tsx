@@ -44,7 +44,7 @@ export default function Home() {
     [activeFrames, options.gridSize]
   )
   const trailCellKeys = useMemo(() => {
-    if (!customPath.length) return false as const
+    if (mode !== 'custom' || !customPath.length) return false as const
     const set = new Set<string>()
     for (const step of customPath) {
       const cells = [step.cells, ...(step.tracks?.map((t) => t.cells) ?? [])].flat()
@@ -54,11 +54,11 @@ export default function Home() {
       }
     }
     return set
-  }, [customPath])
+  }, [customPath, mode])
 
   const trailedFrames = useMemo(
-    () => applyTrailToFrames(safeFrames, options.trail && mode === 'preset' ? true : trailCellKeys),
-    [safeFrames, options.trail, trailCellKeys, mode]
+    () => applyTrailToFrames(safeFrames, !options.trail ? false : (trailCellKeys !== false && trailCellKeys.size > 0) ? trailCellKeys : true),
+    [safeFrames, options.trail, trailCellKeys]
   )
   const displayOptions = useMemo(() => ({
     ...options,
