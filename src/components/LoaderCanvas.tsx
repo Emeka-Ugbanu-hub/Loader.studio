@@ -37,11 +37,54 @@ export default function LoaderCanvas({
   const lastTimeRef = useRef(0)
   const accumulatedRef = useRef(0)
   const rafRef = useRef<number>(0)
+  const bgCacheRef = useRef<HTMLCanvasElement | null>(null)
 
   const cellProps = useMemo(
     () => customPath ? extractCellProps(customPath) : { colors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() },
     [customPath]
   )
+
+  const buildBgCache = useCallback((canvasSize: number) => {
+    const { gridSize, cellSize, gap, layout = 'matrix' } = options
+    const globalShape = layoutCellShape(layout, options.shape)
+    const baseCellSize = getDisplayCellSize(gridSize, cellSize, 440)
+    const baseGap = gap
+    const baseGrid = getVisualGrid(layout, gridSize, baseCellSize, baseGap)
+    const fitScale = showBgGrid ? Math.min(1, (canvasSize * 0.92) / Math.max(baseGrid.width, baseGrid.height)) : 0
+    if (fitScale <= 0) { bgCacheRef.current = null; return }
+    const drawCellSize = baseCellSize * fitScale
+    const drawGap = baseGap * fitScale
+    const visualGrid = getVisualGrid(layout, gridSize, drawCellSize, drawGap)
+    const cellMap = getCellMap(visualGrid)
+    const hiddenSet = new Set(hiddenCells)
+
+    const dpr = window.devicePixelRatio || 1
+    const cache = bgCacheRef.current ?? document.createElement('canvas')
+    cache.width = Math.ceil(visualGrid.width * dpr)
+    cache.height = Math.ceil(visualGrid.height * dpr)
+    cache.style.width = `${visualGrid.width}px`
+    cache.style.height = `${visualGrid.height}px`
+    const cctx = cache.getContext('2d')
+    if (!cctx) return
+    cctx.scale(dpr, dpr)
+
+    cctx.clearRect(0, 0, visualGrid.width, visualGrid.height)
+
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        if (hiddenSet.has(cellKey(r, c))) continue
+        const visualCell = cellMap.get(cellKey(r, c))
+        if (!visualCell?.visible) continue
+        const bgShape = cellProps.shapes.get(cellKey(r, c)) ?? globalShape
+        cctx.fillStyle = 'rgba(255,255,255,0.08)'
+        drawCellShape(cctx, visualCell.x, visualCell.y, drawCellSize, bgShape, visualCell.orientation)
+      }
+    }
+
+    bgCacheRef.current = cache
+  }, [options, showBgGrid, hiddenCells, cellProps])
+
+  useEffect(() => { buildBgCache(canvasSize) }, [buildBgCache, canvasSize])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, w: number, h: number, frame: number[][]) => {
     const { gridSize, cellSize, gap, color, layout = 'matrix' } = options
@@ -61,26 +104,15 @@ export default function LoaderCanvas({
 
     ctx.clearRect(0, 0, w, h)
 
-    if (showBgGrid) {
-      for (let r = 0; r < gridSize; r++) {
-        for (let c = 0; c < gridSize; c++) {
-          if (hiddenSet.has(`${r},${c}`)) continue
-          const visualCell = cellMap.get(cellKey(r, c))
-          if (!visualCell?.visible) continue
-          const bgShape = cellProps.shapes.get(cellKey(r, c)) ?? globalShape
-          const x = ox + visualCell.x
-          const y = oy + visualCell.y
-          ctx.fillStyle = 'rgba(255,255,255,0.08)'
-          drawCellShape(ctx, x, y, drawCellSize, bgShape, visualCell.orientation)
-        }
-      }
+    if (showBgGrid && bgCacheRef.current) {
+      ctx.drawImage(bgCacheRef.current, ox, oy, visualGrid.width, visualGrid.height)
     }
 
     ctx.save()
 
     for (let r = 0; r < gridSize; r++) {
       for (let c = 0; c < gridSize; c++) {
-        if (hiddenSet.has(`${r},${c}`)) continue
+        if (hiddenSet.has(cellKey(r, c))) continue
         const visualCell = cellMap.get(cellKey(r, c))
         if (!visualCell?.visible) continue
         const alpha = frame[r]?.[c]
