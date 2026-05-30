@@ -18,6 +18,7 @@ export interface CustomPathPoint {
   col: number
   opacity?: number
   color?: string
+  trailColor?: string
   glow?: number
   trail?: boolean
   shape?: CellShape
@@ -31,10 +32,17 @@ export interface CustomParallelTrack {
   pattern?: MovementPattern
 }
 
+export interface CustomAnimationUnit {
+  id?: string
+  cells: CustomPathPoint[]
+}
+
 export interface CustomPathStep {
   cells: CustomPathPoint[]
+  units?: CustomAnimationUnit[]
   opacity?: number
   color?: string
+  trailColor?: string
   glow?: number
   trail?: boolean
   shape?: CellShape
@@ -44,6 +52,9 @@ export interface CustomPathStep {
   play?: 'together' | 'one-by-one'
   timing?: 'sequence' | 'simultaneous'
   accumulate?: boolean
+  motionMode?: 'window' | 'fill'
+  activeCount?: number
+  startCells?: CustomPathPoint[]
   tracks?: CustomParallelTrack[]
 }
 

@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import type { CellShape, CustomPathPoint, CustomPathStep, LoaderOptions, MovementPattern } from '@/lib/types'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CellShape, CustomAnimationUnit, CustomPathPoint, CustomPathStep, LoaderOptions, MovementPattern } from '@/lib/types'
 import { generateCustomFrames } from '@/lib/patterns'
 import { getCellMap, getVisualGrid, layoutCellShape } from '@/lib/gridLayout'
 import { getDisplayCellSize } from '@/lib/displaySizing'
+import { getStepCells, getStepUnits } from '@/lib/utils'
 import InfoTip from './InfoTip'
 
 interface Props {
@@ -24,15 +25,12 @@ function labelForPath(index: number) {
   return String.fromCharCode(65 + index)
 }
 
-function getStepCells(step: CustomPathStep) {
-  return [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
-}
-
 function cellAlpha(cell: CustomPathPoint) {
   return cell.opacity ?? 100
 }
 
 type MotionMode = 'clicked' | 'together' | MovementPattern
+type MotionType = 'one' | 'group' | 'fill'
 
 const MOTION_OPTIONS: { value: MotionMode; label: string }[] = [
   { value: 'clicked', label: 'Clicked order' },
@@ -48,10 +46,69 @@ const MOTION_OPTIONS: { value: MotionMode; label: string }[] = [
 const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
 const MIN_EDITOR_CELL_SIZE = 28
 
+function newUnitId() {
+  return `unit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function flattenUnits(units: ReturnType<typeof getStepUnits>) {
+  return units.flatMap((unit) => unit.cells)
+}
+
+function unitsWithoutKeys(step: CustomPathStep, keySet: Set<string>) {
+  return getStepUnits(step)
+    .map((unit) => ({
+      ...unit,
+      cells: unit.cells.filter((cell) => !keySet.has(k(cell.row, cell.col))),
+    }))
+    .filter((unit) => unit.cells.length > 0)
+}
+
+function stepWithUnits(step: CustomPathStep, units: ReturnType<typeof getStepUnits>): CustomPathStep {
+  return {
+    ...step,
+    cells: flattenUnits(units),
+    units,
+    tracks: undefined,
+  }
+}
+
+function unitOrientation(cells: CustomPathPoint[]): 'row' | 'column' | 'block' | 'single' {
+  if (cells.length <= 1) return 'single'
+  const rowValues = cells.map((cell) => cell.row)
+  const colValues = cells.map((cell) => cell.col)
+  const rows = new Set(rowValues)
+  const cols = new Set(colValues)
+  if (cols.size === 1 && rows.size > 1) return 'column'
+  if (rows.size === 1 && cols.size > 1) return 'row'
+  const height = Math.max(...rowValues) - Math.min(...rowValues) + 1
+  const width = Math.max(...colValues) - Math.min(...colValues) + 1
+  if (height > width) return 'column'
+  if (width > height) return 'row'
+  return 'block'
+}
+
+function inferredPatternForCells(cells: CustomPathPoint[]): MovementPattern {
+  const orientation = unitOrientation(cells)
+  if (orientation === 'column') return 'wave-lr'
+  if (orientation === 'row') return 'wave-tb'
+  return 'pulse'
+}
+
+function selectedKeysCoverGroupedUnit(step: CustomPathStep, keys: Set<string>) {
+  return getStepUnits(step).some((unit) => (
+    unit.cells.length > 1 && unit.cells.every((cell) => keys.has(k(cell.row, cell.col)))
+  ))
+}
+
 function getMotionMode(step?: CustomPathStep): MotionMode {
   if (step?.play === 'together') return 'together'
   if (step?.buildAs !== 'group') return 'clicked'
   return step?.pattern ?? 'clicked'
+}
+
+function getMotionType(step?: CustomPathStep): MotionType {
+  if ((step?.motionMode ?? (step?.accumulate === false ? 'window' : 'fill')) === 'fill') return 'fill'
+  return (step?.activeCount ?? 1) > 1 ? 'group' : 'one'
 }
 
 export default function CustomPatternEditor({
@@ -66,6 +123,7 @@ export default function CustomPatternEditor({
   const [hoveredPathIndex, setHoveredPathIndex] = useState<number | null>(null)
   const [multiSelectMode, setMultiSelectMode] = useState(false)
   const [reversedIndex, setReversedIndex] = useState<number | null>(null)
+  const [moreStyleOpen, setMoreStyleOpen] = useState(false)
 
   const hiddenSet = useMemo(() => new Set(hiddenCells), [hiddenCells])
   const selectedSet = useMemo(() => new Set(selectedKeys), [selectedKeys])
@@ -73,13 +131,19 @@ export default function CustomPatternEditor({
   const activePath = path[safeActivePathIndex]
 
   const cellToPlacement = useMemo(() => {
-    const placements = new Map<string, { pathIndex: number; cellIndex: number; isGroup: boolean }>()
+    const placements = new Map<string, { pathIndex: number; cellIndex: number; unitIndex: number; unitCellIndex: number; isGroup: boolean }>()
     path.forEach((step, pathIndex) => {
-      getStepCells(step).forEach((cell, cellIndex) => {
-        placements.set(k(cell.row, cell.col), {
-          pathIndex,
-          cellIndex,
-          isGroup: step.buildAs === 'group',
+      let cellIndex = 0
+      getStepUnits(step).forEach((unit, unitIndex) => {
+        unit.cells.forEach((cell, unitCellIndex) => {
+          placements.set(k(cell.row, cell.col), {
+            pathIndex,
+            cellIndex,
+            unitIndex,
+            unitCellIndex,
+            isGroup: unit.cells.length > 1,
+          })
+          cellIndex++
         })
       })
     })
@@ -110,6 +174,7 @@ export default function CustomPatternEditor({
   const selectedProps = useMemo(() => {
     let opacity = 100
     let color = options.color
+    let trailColor: string | undefined
     let glow = options.glow
     let trail = false
     let size = 1
@@ -118,13 +183,14 @@ export default function CustomPatternEditor({
     for (const cell of selectedCells) {
       opacity = cellAlpha(cell)
       if (cell.color) color = cell.color
+      if (cell.trailColor) trailColor = cell.trailColor
       if (cell.glow != null) glow = cell.glow
       if (cell.trail != null) trail = cell.trail
       if (cell.size != null) size = cell.size
       if (cell.shape) shape = cell.shape
     }
 
-    return { opacity, color, glow, trail, size, shape }
+    return { opacity, color, trailColor: trailColor ?? color, glow, trail, size, shape }
   }, [selectedCells, options.color, options.glow])
 
   const updatePath = useCallback((nextPath: CustomPathStep[]) => {
@@ -145,12 +211,16 @@ export default function CustomPatternEditor({
     if (hiddenSet.has(key) || cellToPlacement.has(key)) return
 
     const nextCell: CustomPathPoint = { row, col }
-    const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step).map((c) => ({ ...c })) }))
+    const nextPath = path.map((step) => stepWithUnits(step, getStepUnits(step).map((unit) => ({
+      ...unit,
+      cells: unit.cells.map((c) => ({ ...c })),
+    }))))
     const index = safeActivePathIndex
 
     if (index >= nextPath.length) {
       nextPath.push({
         cells: [nextCell],
+        units: [{ id: newUnitId(), cells: [nextCell] }],
         buildAs: 'singles',
         play: 'one-by-one',
         timing: 'sequence',
@@ -160,6 +230,7 @@ export default function CustomPatternEditor({
       nextPath[index] = {
         ...nextPath[index],
         cells: [...getStepCells(nextPath[index]), nextCell],
+        units: [...getStepUnits(nextPath[index]), { id: newUnitId(), cells: [nextCell] }],
         tracks: undefined,
         buildAs: nextPath[index].buildAs ?? 'singles',
         play: nextPath[index].play ?? 'one-by-one',
@@ -176,30 +247,29 @@ export default function CustomPatternEditor({
     const placement = cellToPlacement.get(key)
     if (placement) {
       setActivePathIndex(placement.pathIndex)
+      const unitKeys = getStepUnits(path[placement.pathIndex])[placement.unitIndex]?.cells.map((cell) => k(cell.row, cell.col)) ?? [key]
+      const keysToToggle = placement.isGroup ? unitKeys : [key]
       if (shiftKey || multiSelectMode) {
-        setSelectedKeys((keys) =>
-          keys.includes(key)
-            ? keys.filter((k) => k !== key)
-            : [...keys, key]
-        )
+        setSelectedKeys((keys) => {
+          const hasEveryKey = keysToToggle.every((candidate) => keys.includes(candidate))
+          return hasEveryKey
+            ? keys.filter((candidate) => !keysToToggle.includes(candidate))
+            : Array.from(new Set([...keys, ...keysToToggle]))
+        })
       } else {
-        setSelectedKeys([key])
+        setSelectedKeys(keysToToggle)
       }
       return
     }
 
     appendCellToPath(row, col)
-  }, [appendCellToPath, cellToPlacement, hiddenSet, multiSelectMode])
+  }, [appendCellToPath, cellToPlacement, hiddenSet, multiSelectMode, path])
 
   const withoutSelectedCells = useCallback(() => (
     path.flatMap((step) => {
-      const cells = getStepCells(step).filter((cell) => !selectedSet.has(k(cell.row, cell.col)))
-      if (cells.length === 0) return []
-      return [{
-        ...step,
-        cells,
-        tracks: undefined,
-      }]
+      const units = unitsWithoutKeys(step, selectedSet)
+      if (units.length === 0) return []
+      return [stepWithUnits(step, units)]
     })
   ), [path, selectedSet])
 
@@ -213,31 +283,59 @@ export default function CustomPatternEditor({
 
   const scopeKeys = useMemo(() => new Set(selectedKeys), [selectedKeys])
 
-  const updateCellProp = useCallback((val: string | number | boolean, prop: 'opacity' | 'color' | 'glow' | 'trail' | 'size' | 'shape') => {
+  const updateCellProp = useCallback((val: string | number | boolean, prop: 'opacity' | 'color' | 'trailColor' | 'glow' | 'trail' | 'size' | 'shape') => {
     if (scopeKeys.size === 0) return
 
-    updatePath(path.map((step) => ({
-      ...step,
-      cells: getStepCells(step).map((cell) => (
-        scopeKeys.has(k(cell.row, cell.col)) ? { ...cell, [prop]: val } : cell
-      )),
-      tracks: undefined,
-    })))
+    updatePath(path.map((step) => {
+      const shouldPromoteToStep = (prop === 'color' || prop === 'trailColor' || prop === 'trail')
+        && selectedKeysCoverGroupedUnit(step, scopeKeys)
+
+      return {
+        ...step,
+        ...(shouldPromoteToStep ? { [prop]: val } : {}),
+        units: getStepUnits(step).map((unit) => ({
+          ...unit,
+          cells: unit.cells.map((cell) => (
+            scopeKeys.has(k(cell.row, cell.col)) ? { ...cell, [prop]: val } : cell
+          )),
+        })),
+        cells: getStepCells(step).map((cell) => (
+          scopeKeys.has(k(cell.row, cell.col)) ? { ...cell, [prop]: val } : cell
+        )),
+        tracks: undefined,
+      }
+    }))
   }, [path, scopeKeys, updatePath])
 
-  const removeCellProp = useCallback((prop: 'color' | 'glow' | 'trail' | 'size' | 'shape') => {
+  const removeCellProp = useCallback((prop: 'color' | 'trailColor' | 'glow' | 'trail' | 'size' | 'shape') => {
     if (scopeKeys.size === 0) return
 
-    updatePath(path.map((step) => ({
-      ...step,
-      cells: getStepCells(step).map((cell) => {
-        if (!scopeKeys.has(k(cell.row, cell.col))) return cell
-        const copy = { ...cell }
-        delete copy[prop]
-        return copy
-      }),
-      tracks: undefined,
-    })))
+    updatePath(path.map((step) => {
+      const copyStep = { ...step }
+      if ((prop === 'color' || prop === 'trailColor' || prop === 'trail') && selectedKeysCoverGroupedUnit(step, scopeKeys)) {
+        delete copyStep[prop]
+      }
+
+      return {
+        ...copyStep,
+        units: getStepUnits(step).map((unit) => ({
+          ...unit,
+          cells: unit.cells.map((cell) => {
+            if (!scopeKeys.has(k(cell.row, cell.col))) return cell
+            const copy = { ...cell }
+            delete copy[prop]
+            return copy
+          }),
+        })),
+        cells: getStepCells(step).map((cell) => {
+          if (!scopeKeys.has(k(cell.row, cell.col))) return cell
+          const copy = { ...cell }
+          delete copy[prop]
+          return copy
+        }),
+        tracks: undefined,
+      }
+    }))
   }, [path, scopeKeys, updatePath])
 
   const handleMotionChange = useCallback((motion: MotionMode) => {
@@ -254,25 +352,104 @@ export default function CustomPatternEditor({
     )))
   }, [activePath, path, safeActivePathIndex, updatePath])
 
+  const handleMotionTypeChange = useCallback((motionType: MotionType) => {
+    if (!activePath) return
+
+    updatePath(path.map((step, index) => {
+      if (index !== safeActivePathIndex) return step
+      if (motionType === 'fill') return { ...step, motionMode: 'fill', accumulate: true }
+
+      const activeCount = motionType === 'one'
+        ? 1
+        : Math.min(Math.max(step.activeCount ?? 2, 2), Math.max(1, getStepUnits(step).length))
+
+      return {
+        ...step,
+        motionMode: 'window',
+        accumulate: false,
+        activeCount,
+        play: 'one-by-one',
+      }
+    }))
+  }, [activePath, path, safeActivePathIndex, updatePath])
+
+  const handleActiveCountChange = useCallback((count: number) => {
+    if (!activePath) return
+
+    updatePath(path.map((step, index) => (
+      index === safeActivePathIndex
+        ? {
+          ...step,
+          motionMode: 'window',
+          accumulate: false,
+          activeCount: Math.max(1, Math.min(count, getStepUnits(step).length)),
+          play: 'one-by-one',
+        }
+        : step
+    )))
+  }, [activePath, path, safeActivePathIndex, updatePath])
+
+  const handleSetStartCells = useCallback(() => {
+    if (!activePath || selectedKeys.length === 0) return
+
+    const selectedKeySet = new Set(selectedKeys)
+    const selectedStartUnit = getStepUnits(activePath).find((unit) => (
+      unit.cells.length > 1 && unit.cells.some((cell) => selectedKeySet.has(k(cell.row, cell.col)))
+    ))
+    const startCells = getStepCells(activePath)
+      .filter((cell) => selectedKeySet.has(k(cell.row, cell.col)))
+      .map((cell) => ({ row: cell.row, col: cell.col }))
+
+    if (startCells.length === 0) return
+
+    updatePath(path.map((step, index) => (
+      index === safeActivePathIndex
+        ? {
+          ...step,
+          startCells,
+          ...(selectedStartUnit
+            ? {
+              motionMode: 'window' as const,
+              accumulate: false,
+              activeCount: 1,
+              play: 'one-by-one' as const,
+            }
+            : {}),
+        }
+        : step
+    )))
+  }, [activePath, path, safeActivePathIndex, selectedKeys, updatePath])
+
+  const handleClearStartCells = useCallback(() => {
+    if (!activePath) return
+
+    updatePath(path.map((step, index) => {
+      if (index !== safeActivePathIndex) return step
+      const copy = { ...step }
+      delete copy.startCells
+      return copy
+    }))
+  }, [activePath, path, safeActivePathIndex, updatePath])
+
   const handleUngroup = useCallback(() => {
     if (!activePath) return
     updatePath(path.map((step, index) => (
       index === safeActivePathIndex
-        ? { ...step, buildAs: 'singles', pattern: undefined }
+        ? { ...step, buildAs: 'singles', pattern: undefined, units: getStepCells(step).map((cell) => ({ id: newUnitId(), cells: [cell] })) }
         : step
     )))
   }, [activePath, path, safeActivePathIndex, updatePath])
 
   const undoLast = useCallback(() => {
-    const nextPath = path.map((step) => ({ ...step, cells: getStepCells(step), tracks: undefined }))
+    const nextPath = path.map((step) => stepWithUnits(step, getStepUnits(step)))
     const index = Math.min(safeActivePathIndex, nextPath.length - 1)
 
     if (index < 0) return
     const step = nextPath[index]
-    const nextCells = step.cells.slice(0, -1)
+    const nextUnits = getStepUnits(step).slice(0, -1)
 
-    if (nextCells.length === 0) nextPath.splice(index, 1)
-    else nextPath[index] = { ...step, cells: nextCells }
+    if (nextUnits.length === 0) nextPath.splice(index, 1)
+    else nextPath[index] = stepWithUnits(step, nextUnits)
 
     updatePath(nextPath)
     setSelectedKeys([])
@@ -288,14 +465,16 @@ export default function CustomPatternEditor({
 
   const cellProps = useMemo(() => {
     const colors = new Map<string, string>()
+    const trailColors = new Map<string, string>()
     const shapes = new Map<string, CellShape>()
     const glows = new Map<string, number>()
     const sizes = new Map<string, number>()
     for (const step of path) {
-      const cells = [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+      const cells = getStepCells(step)
       for (const c of cells) {
         const key = k(c.row, c.col)
         if (c.color) colors.set(key, c.color)
+        if (c.trailColor) trailColors.set(key, c.trailColor)
         if (c.shape) shapes.set(key, c.shape)
         const g = c.glow ?? step.glow
         if (g != null && g > 0) glows.set(key, g)
@@ -303,7 +482,7 @@ export default function CustomPatternEditor({
         if (s != null && s !== 1) sizes.set(key, s)
       }
     }
-    return { colors, shapes, glows, sizes }
+    return { colors, trailColors, shapes, glows, sizes }
   }, [path])
 
   const editorCellSize = Math.max(
@@ -321,10 +500,66 @@ export default function CustomPatternEditor({
   const selectedCount = selectedKeys.length
   const activeIsGroup = activePath?.buildAs === 'group'
   const activeCellCount = activePath ? getStepCells(activePath).length : 0
+  const activeUnitCount = activePath ? getStepUnits(activePath).length : 0
   const showCreateGroup = selectedCount >= 2
-  const activeMotionOptions = activeIsGroup
-    ? MOTION_OPTIONS
-    : MOTION_OPTIONS.filter((option) => option.value === 'clicked' || option.value === 'together')
+  const activeUnitOrientations = useMemo(() => (
+    activePath ? getStepUnits(activePath).map((unit) => unitOrientation(unit.cells)) : []
+  ), [activePath])
+  const activeMotionOptions = useMemo(() => {
+    if (!activeIsGroup) return MOTION_OPTIONS.filter((option) => option.value === 'clicked' || option.value === 'together')
+    const hasColumn = activeUnitOrientations.includes('column')
+    const hasRow = activeUnitOrientations.includes('row')
+    const allowed = new Set<MotionMode>(['clicked', 'together', 'diagonal', 'pulse'])
+    if (hasColumn || hasRow) {
+      allowed.add('wave-lr')
+      allowed.add('wave-rl')
+    } else {
+      allowed.add('wave-lr')
+      allowed.add('wave-rl')
+      allowed.add('wave-tb')
+      allowed.add('wave-bt')
+    }
+    return MOTION_OPTIONS.filter((option) => allowed.has(option.value))
+  }, [activeIsGroup, activeUnitOrientations])
+  const activeMotionValue = useMemo(() => {
+    const current = getMotionMode(activePath)
+    return activeMotionOptions.some((option) => option.value === current)
+      ? current
+      : activeMotionOptions[0]?.value ?? 'clicked'
+  }, [activeMotionOptions, activePath])
+  const activeStartSet = useMemo(() => new Set(
+    activePath?.startCells?.map((cell) => k(cell.row, cell.col)) ?? []
+  ), [activePath])
+  const activeStartLabels = useMemo(() => {
+    if (!activePath?.startCells?.length) return []
+    const startSet = new Set(activePath.startCells.map((cell) => k(cell.row, cell.col)))
+    return getStepUnits(activePath)
+      .map((unit, index) => unit.cells.some((cell) => startSet.has(k(cell.row, cell.col))) ? `${labelForPath(safeActivePathIndex)}${index + 1}` : null)
+      .filter(Boolean) as string[]
+  }, [activePath, safeActivePathIndex])
+  const activeHasGroupedStart = useMemo(() => {
+    if (!activePath?.startCells?.length) return false
+    const startSet = new Set(activePath.startCells.map((cell) => k(cell.row, cell.col)))
+    return getStepUnits(activePath).some((unit) => (
+      unit.cells.length > 1 && unit.cells.some((cell) => startSet.has(k(cell.row, cell.col)))
+    ))
+  }, [activePath])
+  const showMotionTypeControl = activeUnitCount > 1 && !activeHasGroupedStart
+  const showRevealOrderControl = activePath && activeCellCount > 1 && activeMotionOptions.length > 1
+  const selectedInActivePath = selectedKeys.some((key) => cellToPlacement.get(key)?.pathIndex === safeActivePathIndex)
+  const canSetSelectionStart = Boolean(activePath && selectedInActivePath)
+  const hasSelectedOverrides = selectedProps.color !== options.color
+    || selectedProps.trailColor !== selectedProps.color
+    || selectedProps.glow !== options.glow
+    || selectedProps.size !== 1
+    || selectedProps.shape != null
+
+  useEffect(() => {
+    if (!activePath || activeMotionOptions.length !== 1) return
+    const onlyOption = activeMotionOptions[0].value
+    if (getMotionMode(activePath) === onlyOption) return
+    handleMotionChange(onlyOption)
+  }, [activeMotionOptions, activePath, handleMotionChange])
 
   const handleCreateGroup = useCallback(() => {
     if (selectedCount < 2) return
@@ -341,30 +576,74 @@ export default function CustomPatternEditor({
       const allCells = getStepCells(path[index])
       const selectedCoversPath = allCells.length === selectedCells.length
         && allCells.every((cell) => keySet.has(k(cell.row, cell.col)))
+      const groupUnit = { id: newUnitId(), cells: selectedCells }
 
       if (selectedCoversPath) {
         updatePath(path.map((step, stepIndex) => (
           stepIndex === index
-            ? { ...step, cells: selectedCells, tracks: undefined, buildAs: 'group', play: 'one-by-one', pattern: 'wave-lr' }
+            ? {
+              ...step,
+              cells: selectedCells,
+              units: [groupUnit],
+              tracks: undefined,
+              buildAs: 'group',
+              play: 'one-by-one',
+              pattern: inferredPatternForCells(selectedCells),
+            }
             : step
         )))
         setActivePathIndex(index)
         setSelectedKeys([])
         return
       }
+
+      const nextUnits = getStepUnits(path[index]).flatMap((unit) => {
+        const selectedInUnit = unit.cells.filter((cell) => keySet.has(k(cell.row, cell.col)))
+        const remainingCells = unit.cells.filter((cell) => !keySet.has(k(cell.row, cell.col)))
+        const pieces: CustomAnimationUnit[] = []
+
+        if (selectedInUnit.length > 0 && !pieces.some((piece) => piece === groupUnit)) {
+          pieces.push(groupUnit)
+        }
+        if (remainingCells.length > 0) {
+          pieces.push({ ...unit, cells: remainingCells })
+        }
+
+        return pieces
+      })
+
+      const dedupedUnits = nextUnits.filter((unit, unitIndex) => (
+        unit !== groupUnit || nextUnits.findIndex((candidate) => candidate === groupUnit) === unitIndex
+      ))
+
+      updatePath(path.map((step, stepIndex) => (
+        stepIndex === index
+          ? {
+            ...stepWithUnits(step, dedupedUnits),
+            buildAs: 'group',
+            play: 'one-by-one',
+            pattern: inferredPatternForCells(selectedCells),
+          }
+          : step
+      )))
+      setActivePathIndex(index)
+      setSelectedKeys([])
+      return
     }
 
     const basePath = path.flatMap((step) => {
-      const remaining = getStepCells(step).filter((cell) => !keySet.has(k(cell.row, cell.col)))
-      if (remaining.length === 0) return []
-      return [{ ...step, cells: remaining, tracks: undefined }]
+      const remainingUnits = unitsWithoutKeys(step, keySet)
+      if (remainingUnits.length === 0) return []
+      return [stepWithUnits(step, remainingUnits)]
     })
 
+    const groupUnit = { id: newUnitId(), cells: selectedCells }
     const step: CustomPathStep = {
       cells: selectedCells,
+      units: [groupUnit],
       buildAs: 'group',
       play: 'one-by-one',
-      pattern: 'wave-lr',
+      pattern: inferredPatternForCells(selectedCells),
       timing: basePath.length === 0 ? 'sequence' : 'sequence',
     }
 
@@ -384,7 +663,7 @@ export default function CustomPatternEditor({
   const reversePath = useCallback((index: number) => {
     updatePath(path.map((step, stepIndex) => (
       stepIndex === index
-        ? { ...step, cells: [...getStepCells(step)].reverse() }
+        ? stepWithUnits(step, [...getStepUnits(step)].reverse())
         : step
     )))
   }, [path, updatePath])
@@ -466,6 +745,7 @@ export default function CustomPatternEditor({
                   const isActivePath = placement?.pathIndex === safeActivePathIndex
                   const isHoveredPath = placement != null && placement.pathIndex === hoveredPathIndex
                   const isIdlePath = placement != null && placement.pathIndex !== safeActivePathIndex && !isSelected
+                  const isStartCell = placement?.pathIndex === safeActivePathIndex && activeStartSet.has(key)
                   const cellColor = cellProps.colors.get(key) ?? options.color
                   const cellGlow = cellProps.glows.get(key) ?? options.glow
                   const cellShape = cellProps.shapes.get(key) ?? layoutCellShape(options.layout ?? 'matrix', options.shape)
@@ -481,7 +761,7 @@ export default function CustomPatternEditor({
                         event.preventDefault()
                         toggleHiddenCell(row, col)
                       }}
-                      className={`builder-cell tile-${cellShape} ${cellShape === 'triangle' && visualCell.orientation === 'down' ? 'tile-triangle-down' : ''} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''}`}
+                      className={`builder-cell tile-${cellShape} ${cellShape === 'triangle' && visualCell.orientation === 'down' ? 'tile-triangle-down' : ''} ${hidden ? 'is-hidden' : ''} ${isSelected ? 'is-selected' : ''} ${placement ? 'has-step' : ''} ${isActivePath ? 'is-active-path' : ''} ${isHoveredPath ? 'is-hovered-path' : ''} ${isIdlePath ? 'is-idle-path' : ''} ${placement?.isGroup ? 'is-group' : ''} ${isStartCell ? 'is-start-cell' : ''}`}
                       style={{
                         width: editorCellSize,
                         height: editorCellSize,
@@ -496,7 +776,12 @@ export default function CustomPatternEditor({
                       {hidden ? (
                         <span className="cell-mask" />
                       ) : placement ? (
-                        <span className="cell-index" style={customColor ? { background: cellColor, color: '#030303' } : undefined}>{placement.cellIndex + 1}</span>
+                        <>
+                          <span className="cell-index" style={customColor ? { background: cellColor, color: '#030303' } : undefined}>
+                            {placement.isGroup ? `G${placement.unitIndex + 1}` : placement.cellIndex + 1}
+                          </span>
+                          {isStartCell && <span className="cell-start-marker" />}
+                        </>
                       ) : null}
                     </button>
                   )
@@ -527,25 +812,6 @@ export default function CustomPatternEditor({
               </InfoTip>
             </div>
 
-            {activePath && (
-              <div className="inspector-row" style={{ paddingBottom: 6 }}>
-                <span className="control-label">Accumulate</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    updatePath(path.map((step, i) => (
-                      i === safeActivePathIndex
-                        ? { ...step, accumulate: step.accumulate === false ? true : false }
-                        : step
-                    )))
-                  }}
-                  className={`toggle-switch ${activePath.accumulate !== false ? 'is-active' : ''}`}
-                >
-                  <span />
-                </button>
-              </div>
-            )}
-
             <div className="paths-scroll">
               <div className="path-strip">
                 {path.map((step, index) => (
@@ -563,7 +829,11 @@ export default function CustomPatternEditor({
                       }}
                     >
                       <strong>{labelForPath(index)}</strong>
-                      <span>{getStepCells(step).length} cells</span>
+                      <span>
+                        {getStepUnits(step).length === getStepCells(step).length
+                          ? `${getStepCells(step).length} cells`
+                          : `${getStepUnits(step).length} units / ${getStepCells(step).length} cells`}
+                      </span>
                       {step.buildAs === 'group' && (
                         <em onClick={(e) => { e.stopPropagation(); handleUngroup() }} title="Click to ungroup">
                           Group ✕
@@ -585,15 +855,22 @@ export default function CustomPatternEditor({
                       >Reverse</button>
                     </div>
                     {index > 0 && (
-                      <button
-                        className="timing-row"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleStepTiming(index)
-                        }}
-                      >
-                        {step.timing === 'simultaneous' ? 'Starts with previous' : 'Starts after previous'}
-                      </button>
+                      <div className="timing-segment" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className={step.timing !== 'simultaneous' ? 'is-active' : ''}
+                          onClick={() => step.timing === 'simultaneous' && toggleStepTiming(index)}
+                        >
+                          After
+                        </button>
+                        <button
+                          type="button"
+                          className={step.timing === 'simultaneous' ? 'is-active' : ''}
+                          onClick={() => step.timing !== 'simultaneous' && toggleStepTiming(index)}
+                        >
+                          With previous
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -605,7 +882,7 @@ export default function CustomPatternEditor({
             </div>
 
             <div className="path-actions">
-              {activePath && getStepCells(activePath).length > 0 && (
+              {activePath && getStepCells(activePath).length > 0 && selectedCount === 0 && activePathIndex < path.length && (
                 <button
                   className="path-action-primary"
                   onClick={() => {
@@ -633,12 +910,12 @@ export default function CustomPatternEditor({
               </div>
             </section>
 
-          <section>
+          <section className="selection-panel">
             <div className="inspector-row">
               <p className="inspector-label">Selection</p>
               <InfoTip title="Selection">
-                <p>Selection is for editing cells that already exist in a path.</p>
-                <p>Click selects one cell. Shift-click adds more on desktop. Use Select multiple on touch devices. Create group turns selected cells into one grouped motion layer.</p>
+                <p>Selection is where you edit the current cells or group.</p>
+                <p>Use the first row for common actions. More style keeps detailed controls out of the way until needed.</p>
               </InfoTip>
               {selectedCount > 0 && (
                 <button className="text-button" onClick={() => setSelectedKeys([])}>Deselect</button>
@@ -662,10 +939,8 @@ export default function CustomPatternEditor({
                     {selectionBasket.map((label) => (
                       <span key={label} className="selection-chip">{label}</span>
                     ))}
+                    {hasSelectedOverrides && <span className="selection-chip is-override">Override</span>}
                   </div>
-                )}
-                {showCreateGroup && (
-                  <button onClick={handleCreateGroup} className="secondary-action">Create group</button>
                 )}
                 {selectedCount > 0 && (
                   <>
@@ -680,6 +955,132 @@ export default function CustomPatternEditor({
                         <span>Select multiple</span>
                       </label>
                     </div>
+                    <div className="quick-action-grid">
+                      {showCreateGroup && (
+                        <button onClick={handleCreateGroup} className="secondary-action">Group selection</button>
+                      )}
+                      {canSetSelectionStart && (
+                        <button onClick={handleSetStartCells} className="secondary-action">Set start</button>
+                      )}
+                      {activePath?.startCells?.length ? (
+                        <button onClick={handleClearStartCells} className="path-action-secondary">Clear start</button>
+                      ) : null}
+                      {activeIsGroup && (
+                        <button onClick={handleUngroup} className="path-action-secondary">Ungroup</button>
+                      )}
+                    </div>
+
+                    <div className="selection-style-quick">
+                      <div className="inline-control">
+                        <span>Trail</span>
+                        <button
+                          type="button"
+                          onClick={() => updateCellProp(!selectedProps.trail, 'trail')}
+                          className={`toggle-switch ${selectedProps.trail ? 'is-active' : ''}`}
+                          aria-pressed={selectedProps.trail}
+                        >
+                          <span />
+                        </button>
+                      </div>
+                      <div className="inline-control">
+                        <span>Color</span>
+                        <input
+                          type="color"
+                          value={selectedProps.color}
+                          onChange={(e) => updateCellProp(e.target.value, 'color')}
+                          aria-label="Selected cell color"
+                        />
+                        {selectedProps.color !== options.color && (
+                          <button onClick={() => removeCellProp('color')}>Reset</button>
+                        )}
+                      </div>
+                      {selectedProps.trail && (
+                        <div className="inline-control">
+                          <span>Trail color</span>
+                          <input
+                            type="color"
+                            value={selectedProps.trailColor || selectedProps.color}
+                            onChange={(e) => updateCellProp(e.target.value, 'trailColor')}
+                            aria-label="Selected trail color"
+                          />
+                          {selectedProps.trailColor !== selectedProps.color && (
+                            <button onClick={() => removeCellProp('trailColor')}>Reset</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="more-style-toggle"
+                      onClick={() => setMoreStyleOpen((open) => !open)}
+                    >
+                      {moreStyleOpen ? 'Hide more style' : 'More style'}
+                    </button>
+
+                    {moreStyleOpen && (
+                      <div className="more-style-panel">
+                        <label className="mini-slider">
+                          <span>Opacity</span>
+                          <input
+                            type="range"
+                            min={5}
+                            max={100}
+                            step={5}
+                            value={selectedProps.opacity}
+                            onChange={(e) => updateCellProp(Number(e.target.value), 'opacity')}
+                          />
+                          <strong>{selectedProps.opacity}%</strong>
+                        </label>
+                        <label className="mini-slider">
+                          <span>Glow</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={50}
+                            step={2}
+                            value={selectedProps.glow}
+                            onChange={(e) => updateCellProp(Number(e.target.value), 'glow')}
+                          />
+                          <strong>{selectedProps.glow}</strong>
+                          {selectedProps.glow !== options.glow && (
+                            <button className="text-button" onClick={() => removeCellProp('glow')}>Reset</button>
+                          )}
+                        </label>
+                        <label className="mini-slider">
+                          <span>Size</span>
+                          <input
+                            type="range"
+                            min={50}
+                            max={200}
+                            step={10}
+                            value={(selectedProps.size ?? 1) * 100}
+                            onChange={(e) => updateCellProp(Number(e.target.value) / 100, 'size')}
+                          />
+                          <strong>{Math.round((selectedProps.size ?? 1) * 100)}%</strong>
+                          {(selectedProps.size ?? 1) !== 1 && (
+                            <button className="text-button" onClick={() => removeCellProp('size')}>Reset</button>
+                          )}
+                        </label>
+                        <div className="shape-grid compact">
+                          {SHAPES.map((shape) => (
+                            <button
+                              key={shape}
+                              onClick={() => updateCellProp(shape, 'shape')}
+                              className={`shape-button ${(selectedProps.shape ?? layoutCellShape(options.layout ?? 'matrix', options.shape)) === shape ? 'is-active' : ''}`}
+                              title={shape}
+                              aria-label={`Use ${shape} for selected cells`}
+                            >
+                              <span className={`shape-icon shape-${shape}`} />
+                            </button>
+                          ))}
+                          {selectedProps.shape != null && (
+                            <button className="reset-shape" onClick={() => removeCellProp('shape')}>Reset</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <button onClick={handleRemoveSelected} className="text-button">Remove selected</button>
                   </>
                 )}
@@ -687,125 +1088,65 @@ export default function CustomPatternEditor({
             )}
           </section>
 
-          {activePath && activeCellCount > 1 && (
+          {activePath && activeCellCount > 1 && (showMotionTypeControl || activeStartLabels.length > 0 || showRevealOrderControl) && (
             <section>
               <div className="inspector-row">
                 <p className="inspector-label">Motion</p>
                 <InfoTip title="Motion">
                   <p>Motion controls how the active path reveals itself.</p>
-                  <p>Clicked order follows your cell order. Together reveals every cell in this path at once. Groups can also use wave and pulse motion.</p>
-                </InfoTip>
-                {activeIsGroup && (
-                  <button className="text-button" onClick={handleUngroup}>Ungroup</button>
-                )}
-              </div>
-              <label className="select-control">
-                <span>Reveal</span>
-                <select
-                  value={getMotionMode(activePath)}
-                  onChange={(event) => handleMotionChange(event.target.value as MotionMode)}
-                >
-                  {activeMotionOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </section>
-          )}
-
-          {selectedCount > 0 && (
-            <section>
-              <div className="inspector-row">
-                <p className="inspector-label">Selected style</p>
-                <InfoTip title="Selected style">
-                  <p>These controls change the currently selected cells.</p>
-                  <p>To style a whole path, click that path card first. It selects every cell in the path automatically.</p>
-                  <p>Trail adds a fade to motion. Opacity controls brightness. Glow affects the final animation while the editor keeps glow subtle so it stays usable.</p>
+                  <p>One active makes a single moving head. Moving group keeps several cells active at once. Fill keeps the progressive reveal.</p>
+                  <p>Select numbered cells and click Set start to choose where the motion begins.</p>
                 </InfoTip>
               </div>
-              <div className="inline-control" style={{ marginTop: 4 }}>
-                <span>Trail</span>
-                <button
-                  type="button"
-                  onClick={() => updateCellProp(!selectedProps.trail, 'trail')}
-                  className={`toggle-switch ${selectedProps.trail ? 'is-active' : ''}`}
-                  aria-pressed={selectedProps.trail}
-                >
-                  <span />
-                </button>
-              </div>
-              <label className="mini-slider">
-                <span>Opacity</span>
-                <input
-                  type="range"
-                  min={5}
-                  max={100}
-                  step={5}
-                  value={selectedProps.opacity}
-                  onChange={(e) => updateCellProp(Number(e.target.value), 'opacity')}
-                />
-                <strong>{selectedProps.opacity}%</strong>
-              </label>
-              <label className="mini-slider">
-                <span>Glow</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={50}
-                  step={2}
-                  value={selectedProps.glow}
-                  onChange={(e) => updateCellProp(Number(e.target.value), 'glow')}
-                />
-                <strong>{selectedProps.glow}</strong>
-                {selectedProps.glow > 0 && (
-                  <button className="text-button" onClick={() => removeCellProp('glow')}>Reset</button>
-                )}
-              </label>
-              <label className="mini-slider">
-                <span>Size</span>
-                <input
-                  type="range"
-                  min={50}
-                  max={200}
-                  step={10}
-                  value={(selectedProps.size ?? 1) * 100}
-                  onChange={(e) => updateCellProp(Number(e.target.value) / 100, 'size')}
-                />
-                <strong>{Math.round((selectedProps.size ?? 1) * 100)}%</strong>
-                {(selectedProps.size ?? 1) !== 1 && (
-                  <button className="text-button" onClick={() => removeCellProp('size')}>Reset</button>
-                )}
-              </label>
-              <div className="inline-control">
-                <span>Color</span>
-                <input
-                  type="color"
-                  value={selectedProps.color}
-                  onChange={(e) => updateCellProp(e.target.value, 'color')}
-                  aria-label="Selected cell color"
-                />
-                {selectedProps.color !== options.color && (
-                  <button onClick={() => removeCellProp('color')}>Reset</button>
-                )}
-              </div>
-              <div className="shape-grid compact">
-                {SHAPES.map((shape) => (
-                  <button
-                    key={shape}
-                    onClick={() => updateCellProp(shape, 'shape')}
-                    className={`shape-button ${(selectedProps.shape ?? layoutCellShape(options.layout ?? 'matrix', options.shape)) === shape ? 'is-active' : ''}`}
-                    title={shape}
-                    aria-label={`Use ${shape} for selected cells`}
+              {showMotionTypeControl && (
+                <label className="select-control">
+                  <span>Motion type</span>
+                  <select
+                    value={getMotionType(activePath)}
+                    onChange={(event) => handleMotionTypeChange(event.target.value as MotionType)}
                   >
-                    <span className={`shape-icon shape-${shape}`} />
-                  </button>
-                ))}
-                {selectedProps.shape != null && (
-                  <button className="reset-shape" onClick={() => removeCellProp('shape')}>Reset</button>
-                )}
-              </div>
+                    <option value="one">One active</option>
+                    <option value="group">Moving group</option>
+                    <option value="fill">Fill</option>
+                  </select>
+                </label>
+              )}
+              {showMotionTypeControl && getMotionType(activePath) !== 'fill' && (
+                <label className="mini-slider">
+                  <span>Active steps</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={Math.max(1, activeUnitCount)}
+                    step={1}
+                    value={Math.min(activePath.activeCount ?? 1, Math.max(1, activeUnitCount))}
+                    onChange={(event) => handleActiveCountChange(Number(event.target.value))}
+                  />
+                  <strong>{Math.min(activePath.activeCount ?? 1, Math.max(1, activeUnitCount))}</strong>
+                </label>
+              )}
+              {activeStartLabels.length > 0 && (
+                <div className="selection-basket">
+                  {activeStartLabels.map((label) => (
+                    <span key={label} className="selection-chip">Start {label}</span>
+                  ))}
+                </div>
+              )}
+              {showRevealOrderControl && (
+                <label className="select-control">
+                  <span>Reveal order</span>
+                  <select
+                    value={activeMotionValue}
+                    onChange={(event) => handleMotionChange(event.target.value as MotionMode)}
+                  >
+                    {activeMotionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </section>
           )}
         </div>

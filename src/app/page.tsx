@@ -8,12 +8,13 @@ import CustomPatternEditor from '@/components/CustomPatternEditor'
 import BrandLogo from '@/components/BrandLogo'
 import { generateLoaderHTML, generateLoaderReact } from '@/lib/codeExporter'
 import { generateLoaderSVG } from '@/lib/svgExporter'
-import { applyTrailToFrames, generateCustomFrames, patternGenerators, presetToCustomPath } from '@/lib/patterns'
+import { applyTrailToFrames, generateCustomFrames, generateCustomTrailFrames, patternGenerators, presetToCustomPath } from '@/lib/patterns'
 import type { CustomPathStep, LoaderOptions } from '@/lib/types'
 import { DEFAULT_OPTIONS } from '@/lib/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useLoaderDraft } from '@/lib/useLoaderDraft'
 import { layoutCellShape } from '@/lib/gridLayout'
+import { getStepCells } from '@/lib/utils'
 
 function emptyFrame(size: number) {
   return Array.from({ length: size }, () => Array(size).fill(0))
@@ -47,18 +48,28 @@ export default function Home() {
     if (mode !== 'custom' || !customPath.length) return false as const
     const set = new Set<string>()
     for (const step of customPath) {
-      const cells = [step.cells, ...(step.tracks?.map((t) => t.cells) ?? [])].flat()
-      for (const c of cells) {
+      for (const c of getStepCells(step)) {
         const t = c.trail ?? step.trail
         if (t === true) set.add(`${c.row},${c.col}`)
       }
     }
     return set
   }, [customPath, mode])
+  const scopedTrailFrames = useMemo(
+    () => mode === 'custom' && trailCellKeys !== false && trailCellKeys.size > 0
+      ? generateCustomTrailFrames(customPath, options.gridSize)
+      : [],
+    [customPath, mode, options.gridSize, trailCellKeys]
+  )
 
   const trailedFrames = useMemo(
-    () => applyTrailToFrames(safeFrames, !options.trail ? false : (trailCellKeys !== false && trailCellKeys.size > 0) ? trailCellKeys : true),
-    [safeFrames, options.trail, trailCellKeys]
+    () => applyTrailToFrames(
+      safeFrames,
+      trailCellKeys !== false && trailCellKeys.size > 0
+        ? { sourceFrames: scopedTrailFrames }
+        : options.trail
+    ),
+    [safeFrames, options.trail, scopedTrailFrames, trailCellKeys]
   )
   const displayOptions = useMemo(() => ({
     ...options,

@@ -15,7 +15,7 @@ export function generateLoaderSVG(
   const dur = frames.length / speed
   const hiddenSet = new Set(hiddenCells ?? [])
 
-  const props = customPath ? extractCellProps(customPath) : { colors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() }
+  const props = customPath ? extractCellProps(customPath) : { colors: new Map(), trailColors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() }
   const cellColors = props.colors
   const cellShapes = props.shapes
   const cellGlows = props.glows

@@ -1,4 +1,4 @@
-import type { CellShape, CustomPathPoint, CustomPathStep } from './types'
+import type { CellShape, CustomAnimationUnit, CustomPathPoint, CustomPathStep } from './types'
 
 export const SHAPES: CellShape[] = ['square', 'circle', 'diamond', 'triangle', 'hexagon']
 
@@ -7,7 +7,16 @@ export function cellKey(r: number, c: number): string {
 }
 
 export function getStepCells(step: CustomPathStep): CustomPathPoint[] {
+  if (step.units?.length) return step.units.flatMap((unit) => unit.cells)
   return [step.cells, ...(step.tracks?.map((track) => track.cells) ?? [])].flat()
+}
+
+export function getStepUnits(step: CustomPathStep): CustomAnimationUnit[] {
+  if (step.units?.length) return step.units.filter((unit) => unit.cells.length > 0)
+
+  const cells = getStepCells(step)
+  if (step.buildAs === 'group') return cells.length > 0 ? [{ cells }] : []
+  return cells.map((cell) => ({ cells: [cell] }))
 }
 
 export function cellAlpha(cell: CustomPathPoint, fallback?: number): number {
@@ -16,20 +25,29 @@ export function cellAlpha(cell: CustomPathPoint, fallback?: number): number {
 
 export function extractCellProps(path: CustomPathStep[]): {
   colors: Map<string, string>
+  trailColors: Map<string, string>
   shapes: Map<string, CellShape>
   glows: Map<string, number>
   sizes: Map<string, number>
 } {
   const colors = new Map<string, string>()
+  const trailColors = new Map<string, string>()
   const shapes = new Map<string, CellShape>()
   const glows = new Map<string, number>()
   const sizes = new Map<string, number>()
 
   for (const step of path) {
+    const startKeys = new Set(step.startCells?.map((cell) => cellKey(cell.row, cell.col)) ?? [])
+    const hasGroupedStart = getStepUnits(step).some((unit) => (
+      unit.cells.length > 1 && unit.cells.some((cell) => startKeys.has(cellKey(cell.row, cell.col)))
+    ))
     const cells = getStepCells(step)
     for (const c of cells) {
       const key = cellKey(c.row, c.col)
-      if (c.color) colors.set(key, c.color)
+      const color = c.color ?? (hasGroupedStart ? step.color : undefined)
+      const trailColor = c.trailColor ?? step.trailColor ?? color
+      if (color) colors.set(key, color)
+      if (trailColor) trailColors.set(key, trailColor)
       if (c.shape) shapes.set(key, c.shape)
       const g = c.glow ?? step.glow
       if (g != null && g > 0) glows.set(key, g)
@@ -38,5 +56,5 @@ export function extractCellProps(path: CustomPathStep[]): {
     }
   }
 
-  return { colors, shapes, glows, sizes }
+  return { colors, trailColors, shapes, glows, sizes }
 }

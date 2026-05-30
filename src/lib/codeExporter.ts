@@ -34,7 +34,7 @@ function buildAnimatedCells(
   const visualGrid = getVisualGrid(layout, gridSize, cellSize, gap)
   const cellMap = getCellMap(visualGrid)
   const hiddenSet = new Set(hiddenCells ?? [])
-  const props = customPath ? extractCellProps(customPath) : { colors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() }
+  const props = customPath ? extractCellProps(customPath) : { colors: new Map(), trailColors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() }
 
   const cellFrames = new Map<string, number[]>()
   for (let f = 0; f < frames.length; f++) {

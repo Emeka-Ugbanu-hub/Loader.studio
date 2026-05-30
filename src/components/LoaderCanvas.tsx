@@ -20,6 +20,23 @@ interface Props {
   customPath?: CustomPathStep[]
 }
 
+function getMovingGroupStyle(customPath?: CustomPathStep[]) {
+  if (!customPath) return null
+
+  for (const step of customPath) {
+    if (!step.startCells?.length || step.motionMode !== 'window') continue
+    const startKeys = new Set(step.startCells.map((cell) => cellKey(cell.row, cell.col)))
+    const startCells = step.cells.filter((cell) => startKeys.has(cellKey(cell.row, cell.col)))
+    if (startCells.length < 2) continue
+
+    const color = step.color ?? startCells.find((cell) => cell.color)?.color
+    const trailColor = step.trailColor ?? startCells.find((cell) => cell.trailColor)?.trailColor ?? color
+    if (color || trailColor) return { color, trailColor }
+  }
+
+  return null
+}
+
 export default function LoaderCanvas({
   options,
   frames,
@@ -40,9 +57,10 @@ export default function LoaderCanvas({
   const bgCacheRef = useRef<HTMLCanvasElement | null>(null)
 
   const cellProps = useMemo(
-    () => customPath ? extractCellProps(customPath) : { colors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() },
+    () => customPath ? extractCellProps(customPath) : { colors: new Map(), trailColors: new Map(), shapes: new Map(), glows: new Map(), sizes: new Map() },
     [customPath]
   )
+  const movingGroupStyle = getMovingGroupStyle(customPath)
 
   const buildBgCache = useCallback((canvasSize: number) => {
     const { gridSize, cellSize, gap, layout = 'matrix' } = options
@@ -118,14 +136,15 @@ export default function LoaderCanvas({
         const alpha = frame[r]?.[c]
         if (alpha != null && alpha > 0) {
           const key = cellKey(r, c)
-          const cellColor = cellProps.colors.get(key) || color
+          const baseColor = cellProps.colors.get(key) || movingGroupStyle?.color || color
+          const resolvedColor = alpha < 0.7 ? (cellProps.trailColors.get(key) || movingGroupStyle?.trailColor || baseColor) : baseColor
           const cellShape = cellProps.shapes.get(key) ?? globalShape
           const glow = cellProps.glows.get(key) ?? options.glow
           ctx.globalAlpha = alpha
-          ctx.fillStyle = cellColor
+          ctx.fillStyle = resolvedColor
           if (glow > 0) {
             ctx.shadowBlur = glow * 2
-            ctx.shadowColor = cellColor
+            ctx.shadowColor = resolvedColor
           }
           const x = ox + visualCell.x
           const y = oy + visualCell.y
@@ -139,7 +158,7 @@ export default function LoaderCanvas({
       }
     }
     ctx.restore()
-  }, [options, showBgGrid, hiddenCells, cellProps])
+  }, [options, showBgGrid, hiddenCells, cellProps, movingGroupStyle?.color, movingGroupStyle?.trailColor])
 
   useEffect(() => {
     const canvas = canvasRef.current

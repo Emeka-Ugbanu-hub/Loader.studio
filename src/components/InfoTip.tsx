@@ -78,8 +78,10 @@ export default function InfoTip({ title, children }: Props) {
     setOpen((current) => {
       const next = !current
       if (next) {
-        window.dispatchEvent(new CustomEvent(OPEN_INFO_EVENT, { detail: id }))
-        requestAnimationFrame(updatePosition)
+        window.setTimeout(() => {
+          window.dispatchEvent(new CustomEvent(OPEN_INFO_EVENT, { detail: id }))
+          requestAnimationFrame(updatePosition)
+        }, 0)
       }
       return next
     })
